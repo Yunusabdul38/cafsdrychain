@@ -2,8 +2,9 @@
 pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
-import {RoleManager} from "../src/RoleManager.sol";
-import {BatchRegistry} from "../src/BatchRegistry.sol";
+import {RoleManagerUpgradeable} from "../src/RoleManagerUpgradeable.sol";
+import {BatchRegistryUpgradeable} from "../src/BatchRegistryUpgradeable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployCAFS is Script {
     function run() external {
@@ -17,16 +18,23 @@ contract DeployCAFS is Script {
         address admin = vm.addr(deployerPrivateKey);
         console.log("Deploying contracts with Admin Address:", admin);
 
-        // 1. Deploy RoleManager
-        RoleManager roleManager = new RoleManager(admin);
-        console.log("RoleManager deployed to:", address(roleManager));
+        // 1. Deploy RoleManager Implementation and Proxy
+        RoleManagerUpgradeable roleManagerImplementation = new RoleManagerUpgradeable();
+        ERC1967Proxy roleManagerProxy = new ERC1967Proxy(
+            address(roleManagerImplementation),
+            abi.encodeWithSelector(RoleManagerUpgradeable.initialize.selector, admin)
+        );
+        RoleManagerUpgradeable roleManager = RoleManagerUpgradeable(address(roleManagerProxy));
+        console.log("RoleManager Proxy deployed to:", address(roleManager));
 
-        // 2. Deploy BatchRegistry
-        BatchRegistry batchRegistry = new BatchRegistry(forwarderAddress, address(roleManager));
-        console.log("BatchRegistry deployed to:", address(batchRegistry));
-
-        // Note: Field Officers, Dryer Operators, and Logistics Roles 
-        // will need to be granted via the RoleManager later.
+        // 2. Deploy BatchRegistry Implementation and Proxy
+        BatchRegistryUpgradeable batchRegistryImplementation = new BatchRegistryUpgradeable(forwarderAddress);
+        ERC1967Proxy batchRegistryProxy = new ERC1967Proxy(
+            address(batchRegistryImplementation),
+            abi.encodeWithSelector(BatchRegistryUpgradeable.initialize.selector, address(roleManager))
+        );
+        BatchRegistryUpgradeable batchRegistry = BatchRegistryUpgradeable(address(batchRegistryProxy));
+        console.log("BatchRegistry Proxy deployed to:", address(batchRegistry));
 
         vm.stopBroadcast();
     }

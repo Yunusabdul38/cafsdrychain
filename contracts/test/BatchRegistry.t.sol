@@ -2,107 +2,123 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
-import {RoleManager} from "../src/RoleManager.sol";
-import {BatchRegistry} from "../src/BatchRegistry.sol";
+import {BatchRegistryUpgradeable} from "../src/BatchRegistryUpgradeable.sol";
+import {RoleManagerUpgradeable} from "../src/RoleManagerUpgradeable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-// A simple mock forwarder to test EIP-2771 functionality
+// Mock Forwarder for testing EIP-2771
 contract MockForwarder {
-    function execute(address target, bytes memory data, address sender) external returns (bool) {
-        // Append the sender address to the end of the calldata (EIP-2771 standard)
-        bytes memory forwardData = abi.encodePacked(data, sender);
-        
-        (bool success, ) = target.call(forwardData);
-        return success;
+    function execute(address target, bytes calldata data, address from) external returns (bytes memory) {
+        // Append the "from" address to the end of the calldata as required by ERC2771
+        bytes memory forwarderData = abi.encodePacked(data, from);
+        (bool success, bytes memory result) = target.call(forwarderData);
+        require(success, "Forwarder call failed");
+        return result;
     }
 }
 
 contract BatchRegistryTest is Test {
-    RoleManager roleManager;
-    BatchRegistry batchRegistry;
-    MockForwarder forwarder;
+    BatchRegistryUpgradeable public batchRegistry;
+    RoleManagerUpgradeable public roleManager;
+    MockForwarder public forwarder;
 
     address admin = address(1);
     address fieldOfficer = address(2);
     address dryerOperator = address(3);
     address logisticsOperator = address(4);
-    address unauthorizedUser = address(5);
-    address masterWallet = address(6); // The gas sponsor
+    address masterWallet = address(5); // Pays for gas
+    address unauthorized = address(6);
 
     function setUp() public {
         vm.startPrank(admin);
-        
-        // Deploy Mock Forwarder
         forwarder = new MockForwarder();
 
-        // Deploy RoleManager
-        roleManager = new RoleManager(admin);
+        // Deploy and Initialize RoleManager Proxy
+        RoleManagerUpgradeable roleManagerImpl = new RoleManagerUpgradeable();
+        ERC1967Proxy roleManagerProxy = new ERC1967Proxy(
+            address(roleManagerImpl),
+            abi.encodeWithSelector(RoleManagerUpgradeable.initialize.selector, admin)
+        );
+        roleManager = RoleManagerUpgradeable(address(roleManagerProxy));
+
+        // Deploy and Initialize BatchRegistry Proxy
+        BatchRegistryUpgradeable batchRegistryImpl = new BatchRegistryUpgradeable(address(forwarder));
+        ERC1967Proxy batchRegistryProxy = new ERC1967Proxy(
+            address(batchRegistryImpl),
+            abi.encodeWithSelector(BatchRegistryUpgradeable.initialize.selector, address(roleManager))
+        );
+        batchRegistry = BatchRegistryUpgradeable(address(batchRegistryProxy));
 
         // Grant Roles
         roleManager.grantRole(roleManager.FIELD_OFFICER_ROLE(), fieldOfficer);
         roleManager.grantRole(roleManager.DRYER_OPERATOR_ROLE(), dryerOperator);
         roleManager.grantRole(roleManager.LOGISTICS_ROLE(), logisticsOperator);
 
-        // Deploy Batch Registry, trusting our Mock Forwarder
-        batchRegistry = new BatchRegistry(address(forwarder), address(roleManager));
-        
         vm.stopPrank();
-    }
-
-    function test_DirectCallUnauthorized() public {
-        vm.prank(unauthorizedUser);
-        vm.expectRevert("BatchRegistry: Unauthorized");
-        batchRegistry.registerBatch("BATCH_001", "FACILITY_1", 100, "hash123");
     }
 
     function test_RegisterBatchSuccess() public {
         vm.prank(fieldOfficer);
-        batchRegistry.registerBatch("BATCH_001", "FACILITY_1", 100, "hash123");
+        batchRegistry.registerBatch("BATCH_001", "QmHash123", "Dryer-A", 100);
 
-        BatchRegistry.Batch memory batch = batchRegistry.getBatch("BATCH_001");
-        assertEq(batch.batchId, "BATCH_001");
-        assertEq(batch.creator, fieldOfficer);
-        assertEq(uint(batch.state), uint(BatchRegistry.BatchState.Registered));
-        assertEq(batch.freshWeight, 100);
-        assertEq(batch.currentWeight, 100);
+        assertTrue(batchRegistry.isBatchExists("BATCH_001"));
+        BatchRegistryUpgradeable.Batch memory b = batchRegistry.getBatch("BATCH_001");
+        assertEq(b.freshWeight, 100);
+        assertEq(uint(b.state), uint(BatchRegistryUpgradeable.BatchState.Registered));
+        assertEq(batchRegistry.getTotalBatches(), 1);
     }
 
     function test_MetaTransaction_RegisterBatch() public {
-        // The masterWallet submits the transaction on behalf of the fieldOfficer
-        
-        // The function data we want to execute
+        // Here we simulate the MasterWallet paying the gas, 
+        // but the actual sender is the Field Officer via the forwarder.
+
         bytes memory data = abi.encodeWithSelector(
             batchRegistry.registerBatch.selector,
             "BATCH_002",
-            "FACILITY_1",
-            200,
-            "hash456"
+            "QmHashXYZ",
+            "Dryer-B",
+            200
         );
 
         vm.prank(masterWallet);
-        bool success = forwarder.execute(address(batchRegistry), data, fieldOfficer);
-        assertTrue(success);
+        forwarder.execute(address(batchRegistry), data, fieldOfficer);
 
-        // Verify the batch was created and the creator is correctly identified as fieldOfficer (not masterWallet)
-        BatchRegistry.Batch memory batch = batchRegistry.getBatch("BATCH_002");
-        assertEq(batch.creator, fieldOfficer);
+        assertTrue(batchRegistry.isBatchExists("BATCH_002"));
+        BatchRegistryUpgradeable.Batch memory b = batchRegistry.getBatch("BATCH_002");
+        assertEq(b.creator, fieldOfficer); // Crucial: The creator is the fieldOfficer, not the masterWallet!
+    }
+
+    function test_DirectCallUnauthorized() public {
+        vm.prank(unauthorized);
+        vm.expectRevert(BatchRegistryUpgradeable.Unauthorized.selector);
+        batchRegistry.registerBatch("BATCH_X", "hash", "D-1", 50);
     }
 
     function test_UpdateDryingSession() public {
         vm.prank(fieldOfficer);
-        batchRegistry.registerBatch("BATCH_003", "FACILITY_1", 100, "hash123");
+        batchRegistry.registerBatch("BATCH_003", "hash1", "Dryer-A", 100);
 
         vm.prank(dryerOperator);
-        batchRegistry.updateDryingSession(
-            "BATCH_003", 
-            "DRYER_A", 
-            BatchRegistry.BatchState.DryingStarted, 
-            95, 
-            "hash_drying_started"
-        );
+        batchRegistry.updateDryingSession("BATCH_003", "Dryer-A", 80, BatchRegistryUpgradeable.BatchState.DryingStarted, "hash2");
 
-        BatchRegistry.Batch memory batch = batchRegistry.getBatch("BATCH_003");
-        assertEq(uint(batch.state), uint(BatchRegistry.BatchState.DryingStarted));
-        assertEq(batch.currentWeight, 95);
-        assertEq(batch.currentFacilityId, "DRYER_A");
+        BatchRegistryUpgradeable.Batch memory b = batchRegistry.getBatch("BATCH_003");
+        assertEq(b.currentWeight, 80);
+        assertEq(uint(b.state), uint(BatchRegistryUpgradeable.BatchState.DryingStarted));
+    }
+
+    function test_PauseAndUnpause() public {
+        vm.prank(admin);
+        batchRegistry.pause();
+
+        vm.prank(fieldOfficer);
+        vm.expectRevert(); // Should revert with EnforcedPause
+        batchRegistry.registerBatch("BATCH_PAUSED", "hash", "D-1", 50);
+
+        vm.prank(admin);
+        batchRegistry.unpause();
+
+        vm.prank(fieldOfficer);
+        batchRegistry.registerBatch("BATCH_UNPAUSED", "hash", "D-1", 50);
+        assertTrue(batchRegistry.isBatchExists("BATCH_UNPAUSED"));
     }
 }
