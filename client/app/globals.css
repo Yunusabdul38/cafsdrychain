@@ -10,6 +10,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-magnetik: var(--font-magnetik);
+}
+
+/* Enable layout-stable fallback sizing for the Magnetik font */
+.font-magnetik {
+  font-family: var(--font-magnetik);
+  font-size-adjust: from-font;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -24,3 +31,4 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+

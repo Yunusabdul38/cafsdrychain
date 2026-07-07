@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,6 +11,37 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const magnetik = localFont({
+  src: [
+    {
+      path: "../public/fonts/Magnetik-Regular.otf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/Magnetik-RegularItalic.otf",
+      weight: "400",
+      style: "italic",
+    },
+    {
+      path: "../public/fonts/Magnetik-Medium.otf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/Magnetik-MediumItalic.otf",
+      weight: "500",
+      style: "italic",
+    },
+    {
+      path: "../public/fonts/Magnetik-SemiBold.otf",
+      weight: "600",
+      style: "normal",
+    },
+  ],
+  variable: "--font-magnetik",
 });
 
 export const metadata: Metadata = {
@@ -25,9 +57,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${magnetik.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
+
