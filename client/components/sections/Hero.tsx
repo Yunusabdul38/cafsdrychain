@@ -17,7 +17,7 @@ export default function Hero() {
         </span>
 
         <h1
-          className="max-w-4xl text-5xl font-semibold leading-[1.02] tracking-tight text-white drop-shadow-[0_4px_24px_rgba(6,28,48,0.35)] sm:text-6xl md:text-7xl"
+          className="max-w-4xl text-4xl font-semibold leading-[1.02] tracking-tight text-white drop-shadow-[0_4px_24px_rgba(6,28,48,0.35)] sm:text-6xl md:text-7xl"
           style={{ animation: "rise 0.8s ease-out 0.05s both" }}
         >
           Every Batch.
@@ -26,7 +26,7 @@ export default function Hero() {
         </h1>
 
         <p
-          className="mt-6 max-w-2xl text-lg leading-relaxed text-white/90 drop-shadow-[0_2px_12px_rgba(6,28,48,0.4)] sm:text-xl"
+          className="mt-6 max-w-2xl text-md leading-relaxed text-white/90 drop-shadow-[0_2px_12px_rgba(6,28,48,0.4)] sm:text-xl"
           style={{ animation: "rise 0.8s ease-out 0.12s both" }}
         >
           DryChain brings end-to-end traceability to solar-dried produce,
@@ -35,7 +35,7 @@ export default function Hero() {
         </p>
 
         <div
-          className="mt-9 flex flex-col items-center gap-3 sm:flex-row"
+          className="mt-9 flex items-center gap-3"
           style={{ animation: "rise 0.8s ease-out 0.2s both" }}
         >
           <a
@@ -48,24 +48,8 @@ export default function Hero() {
             href="#verify"
             className="w-full rounded-full bg-brand px-9 py-4 text-base font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5 sm:w-auto"
           >
-            Verify a product
+            Verify
           </a>
-        </div>
-
-        {/* Trust chips */}
-        <div
-          className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm font-medium text-white/90"
-          style={{ animation: "rise 0.9s ease-out 0.28s both" }}
-        >
-          <span className="inline-flex items-center gap-2">
-            <ShieldIcon className="h-5 w-5" /> Tamper-resistant records
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <QrIcon className="h-5 w-5" /> QR verification
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <LinkIcon className="h-5 w-5" /> Immutable on Base
-          </span>
         </div>
       </div>
     </section>
