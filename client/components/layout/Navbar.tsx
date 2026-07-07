@@ -63,13 +63,13 @@ export default function Navbar() {
         {/* Desktop actions */}
         <div className="hidden items-center gap-2 md:flex">
           <a
-            href="#verify"
+            href="/verify"
             className="rounded-full bg-brand px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
           >
             Verify a Batch
           </a>
           <a
-            href="#login"
+            href="/login"
             className="rounded-full bg-brand-dark px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-darker"
           >
             Login
@@ -106,14 +106,14 @@ export default function Navbar() {
           </ul>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <a
-              href="#verify"
+              href="/verify"
               onClick={() => setOpen(false)}
               className="rounded-full bg-brand px-6 py-3 text-center text-sm font-semibold text-white"
             >
               Verify
             </a>
             <a
-              href="#login"
+              href="/login"
               onClick={() => setOpen(false)}
               className="rounded-full bg-brand-dark px-6 py-3 text-center text-sm font-semibold text-white"
             >

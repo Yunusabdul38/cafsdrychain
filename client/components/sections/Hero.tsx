@@ -36,13 +36,13 @@ export default function Hero() {
           style={{ animation: "rise 0.8s ease-out 0.2s both" }}
         >
           <a
-            href="#login"
+            href="/login"
             className="w-full rounded-full bg-white px-9 py-4 text-base font-semibold text-brand-dark shadow-lg transition-transform hover:-translate-y-0.5 sm:w-auto"
           >
             Login
           </a>
           <a
-            href="#verify"
+            href="/verify"
             className="w-full rounded-full bg-brand px-9 py-4 text-base font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5 sm:w-auto"
           >
             Verify
