@@ -1,13 +1,10 @@
-import Image from "next/image";
-import { ShieldIcon, LinkIcon, QrIcon } from "@/components/icons";
-
 export default function Hero() {
   return (
     <section id="home" className="relative isolate overflow-hidden">
       {/* Sky tint for text legibility */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#2f8ae0]/30 via-transparent to-transparent" />
 
-      <div className="mx-auto flex min-h-[92vh] max-w-6xl flex-col items-center justify-center px-6 pt-36 pb-24 text-center">
+      <div className="mx-auto flex min-h-[92vh] max-w-6xl flex-col items-center justify-center px-6 pt-20 pb-24 text-center">
         <span
           className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/15 px-4 py-1.5 text-xs font-medium text-white backdrop-blur-sm sm:text-sm"
           style={{ animation: "rise 0.7s ease-out both" }}
