@@ -2,33 +2,86 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0c1f12;
+
+  /* Brand palette — derived from the hero design */
+  --brand: #47a81d;
+  /* bright leaf green (primary action) */
+  --brand-hover: #3d9317;
+  --brand-dark: #0e3a17;
+  /* deep forest green (secondary action / headings) */
+  --brand-darker: #0a2c12;
+  --sky: #2f8ae0;
+  /* hero sky blue */
+  --sky-soft: #eaf4fe;
+  --mint: #eef8e9;
+  /* pale green tint for cards */
+  --muted: #5b6b60;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-darker: var(--brand-darker);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --color-mint: var(--mint);
+  --color-muted: var(--muted);
+
+  --font-sans: var(--font-magnetik);
+  --font-display: var(--font-magnetik);
   --font-mono: var(--font-geist-mono);
-  --font-magnetik: var(--font-magnetik);
 }
 
-/* Enable layout-stable fallback sizing for the Magnetik font */
-.font-magnetik {
-  font-family: var(--font-magnetik);
-  font-size-adjust: from-font;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-magnetik), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+.font-magnetik {
+  font-family: var(--font-magnetik);
+  font-size-adjust: from-font;
+}
+
+#home {
+  background-image: linear-gradient(rgba(10, 44, 18, 0.65), rgba(10, 44, 18, 0.45)), url('/img/hero-bg-2.png');
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+/* Subtle entrance + float animations reused across sections */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floaty {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
