@@ -8,9 +8,6 @@ import {
   UsersIcon,
   ChartIcon,
   LinkIcon,
-  QrIcon,
-  ShieldIcon,
-  FileIcon,
   SettingsIcon,
   BuildingIcon,
 } from "@/components/icons";
@@ -47,15 +44,6 @@ export const roleMeta: Record<
       location: "HQ · Ibadan",
     },
   },
-  auditor: {
-    title: "Auditor",
-    home: "/auditor",
-    user: {
-      name: "NAFDAC Regulator",
-      email: "regulator@nafdac.gov.ng",
-      location: "Abuja",
-    },
-  },
 };
 
 export const navByRole: Record<Role, NavItem[]> = {
@@ -74,12 +62,5 @@ export const navByRole: Record<Role, NavItem[]> = {
     { label: "Reports", href: "/admin/reports", icon: ChartIcon, mobile: true },
     { label: "Blockchain", href: "/admin/blockchain", icon: LinkIcon, mobile: true },
     { label: "Settings", href: "/admin/settings", icon: SettingsIcon },
-  ],
-  auditor: [
-    { label: "Overview", href: "/auditor", icon: GridIcon, mobile: true },
-    { label: "Verify", href: "/auditor/verify", icon: QrIcon, mobile: true },
-    { label: "Audit trail", href: "/auditor/audit", icon: ShieldIcon, mobile: true },
-    { label: "Reports", href: "/auditor/reports", icon: FileIcon, mobile: true },
-    { label: "Settings", href: "/auditor/settings", icon: SettingsIcon, mobile: true },
   ],
 };

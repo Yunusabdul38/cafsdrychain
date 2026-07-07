@@ -342,16 +342,6 @@ export const operators: Operator[] = [
     batches: 0,
     joined: "2025-11-01",
   },
-  {
-    id: "AU-01",
-    name: "NAFDAC Regulator",
-    email: "regulator@nafdac.gov.ng",
-    location: "Abuja",
-    role: "auditor",
-    status: "active",
-    batches: 0,
-    joined: "2026-04-08",
-  },
 ];
 
 export const chainRecords: ChainRecord[] = batches
@@ -378,7 +368,6 @@ export function metricsFor(role: Role) {
   const total = batches.length;
   const drying = batches.filter((b) => b.stage === "drying").length;
   const delivered = batches.filter((b) => b.stage === "delivered").length;
-  const verified = batches.filter((b) => b.verified).length;
   const inStorage = batches.filter(
     (b) => b.stage === "stored" || b.stage === "in-transit"
   ).length;
@@ -389,14 +378,6 @@ export function metricsFor(role: Role) {
       { label: "Active drying", value: String(drying), hint: "in progress" },
       { label: "Operators", value: "2", hint: "active" },
       { label: "On-chain records", value: String(chainRecords.length), hint: "confirmed" },
-    ];
-  }
-  if (role === "auditor") {
-    return [
-      { label: "Verified batches", value: String(verified), hint: `of ${total}` },
-      { label: "On-chain records", value: String(chainRecords.length), hint: "confirmed" },
-      { label: "Flagged", value: "0", hint: "no anomalies" },
-      { label: "Hubs audited", value: "2", hint: "this month" },
     ];
   }
   // operator

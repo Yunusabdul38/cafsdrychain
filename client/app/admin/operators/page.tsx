@@ -17,7 +17,7 @@ export default function AdminOperators() {
     <>
       <PageHeader
         title="Users"
-        description="Provision and manage operator, admin, and auditor accounts."
+        description="Provision and manage operator and admin accounts."
         action={
           <LinkButton href="/admin/operators/new">
             <PlusIcon className="h-5 w-5" /> Add user

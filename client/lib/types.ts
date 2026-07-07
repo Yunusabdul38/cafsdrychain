@@ -1,4 +1,4 @@
-export type Role = "operator" | "admin" | "auditor";
+export type Role = "operator" | "admin";
 
 export type BatchStage =
   | "registered"

@@ -7,10 +7,127 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum Role {
+  ADMIN
+  OPERATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BatchStage {
+  REGISTERED
+  DRYING
+  DRIED
+  STORED
+  IN_TRANSIT
+  DELIVERED
+}
+
+enum ChainStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
 model User {
+  id                 String         @id @default(uuid())
+  email              String         @unique
+  name               String
+  role               Role           @default(OPERATOR)
+  status             UserStatus     @default(ACTIVE)
+  location           String?
+  passwordHash       String
+  mustChangePassword Boolean        @default(true)
+  wallet             Wallet?
+  batches            Batch[]        @relation("BatchOperator")
+  refreshTokens      RefreshToken[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+/// One deterministic HD wallet per user. Private keys are NEVER stored —
+/// they are re-derived on demand from the master seed + `index`.
+model Wallet {
+  id             String   @id @default(uuid())
+  address        String   @unique
+  index          Int      @unique
+  chain          String   @default("base")
+  derivationPath String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String   @unique
+  createdAt      DateTime @default(now())
+}
+
+/// Single-row atomic counter guaranteeing every new wallet gets the next
+/// unused HD index, even under concurrent signups.
+model WalletCounter {
+  id    Int @id @default(1)
+  value Int @default(0)
+}
+
+model Batch {
+  id              String       @id @default(uuid())
+  batchId         String       @unique // human id e.g. DRY-2K7F-9X1
+  product         String
+  sourceType      String
+  source          String
+  supplier        String
+  freshWeight     Float
+  finalWeight     Float?
+  moisture        Float?
+  deliveryDate    DateTime
+  dryingStart     DateTime?
+  dryingEnd       DateTime?
+  quality         String?
+  storageLocation String?
+  packaging       String?
+  transport       String?
+  destination     String?
+  stage           BatchStage   @default(REGISTERED)
+  location        String
+  metadataHash    String
+  chainStatus     ChainStatus  @default(PENDING)
+  txHash          String?
+  operator        User         @relation("BatchOperator", fields: [operatorId], references: [id])
+  operatorId      String
+  events          BatchEvent[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model BatchEvent {
+  id           String      @id @default(uuid())
+  batch        Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId      String
+  stage        BatchStage
+  title        String
+  actor        String
+  metadataHash String
+  txHash       String?
+  chainStatus  ChainStatus @default(PENDING)
+  createdAt    DateTime    @default(now())
+}
+
+/// Hashed, rotating refresh tokens for session management.
+model RefreshToken {
   id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
+  tokenHash String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+}
+
+/// Security / compliance audit trail of sensitive actions.
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  ip        String?
+  meta      Json?
+  createdAt DateTime @default(now())
 }
