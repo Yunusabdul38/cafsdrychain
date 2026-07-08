@@ -6,8 +6,9 @@ import { deriveSigner } from './derivation.js';
 
 /**
  * Gas sponsorship via ERC-2771: the operator's derived wallet signs a
- * ForwardRequest (no gas, no seed phrase) and the master/relayer wallet submits
- * it, paying the fee. On-chain, the operator wallet is the transaction origin.
+ * ForwardRequest (no gas, no seed phrase held by the user) and the master/
+ * relayer wallet submits it, paying the fee. On-chain, `_msgSender()` resolves
+ * to the operator's EOA — so the operator wallet is the recorded signer.
  */
 
 export type RelayResult = { txHash: string | null; status: 'CONFIRMED' | 'FAILED' | 'SKIPPED' };
@@ -36,7 +37,7 @@ export async function grantOperatorRoles(address: string): Promise<string[]> {
 async function relay(index: number, data: string): Promise<RelayResult> {
   if (!chainEnabled() || !env.FORWARDER_ADDRESS) return SKIPPED;
   try {
-    const signer = deriveSigner(index); // no provider needed to sign
+    const signer = deriveSigner(index); // re-derive operator key to sign, then discard
     const fwd = forwarder();
     const from = signer.address;
     const to = env.BATCH_REGISTRY_ADDRESS as string;
@@ -65,7 +66,7 @@ async function relay(index: number, data: string): Promise<RelayResult> {
   }
 }
 
-// On-chain BatchState enum: 0 Registered,1 DryingStarted,2 DryingCompleted,3 InStorage,4 InTransit,5 Delivered
+// On-chain BatchState: 0 Registered,1 DryingStarted,2 DryingCompleted,3 InStorage,4 InTransit,5 Delivered
 
 export function relayRegister(
   index: number,
@@ -120,7 +121,6 @@ export function relayLogistics(
 export async function verifyOnChain(batchId: string, metadataHash: string): Promise<boolean> {
   if (!chainEnabled()) return false;
   try {
-    // batchRegistry() is already bound to the read provider.
     return await batchRegistry().verifyMetadata(batchId, metadataHash);
   } catch {
     return false;

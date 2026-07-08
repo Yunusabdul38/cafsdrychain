@@ -55,6 +55,7 @@ export async function createUser(input: CreateUserInput) {
   // Best-effort side effects (must not roll back the DB record).
   void sendInviteEmail(input.email, input.name, tempPassword);
   if (input.role === 'OPERATOR' && withWallet?.wallet) {
+    // Authorise the operator's EOA on-chain so its signatures are accepted.
     grantOperatorRoles(withWallet.wallet.address)
       .then((hashes) => hashes.length && logger.info({ hashes }, 'granted operator roles'))
       .catch((err) => logger.error({ err }, 'failed to grant operator roles on-chain'));

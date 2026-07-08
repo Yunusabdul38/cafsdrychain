@@ -17,7 +17,10 @@ const schema = z.object({
   // CORS
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
 
-  // Wallet / chain — MASTER_MNEMONIC should be KMS/HSM-backed in production.
+  // Wallet / chain.
+  // MASTER_XPUB     → watch-only address derivation (safe for the API server).
+  // MASTER_MNEMONIC → full seed; required only to SIGN (signer service; KMS/HSM).
+  MASTER_XPUB: z.string().min(1).optional(),
   MASTER_MNEMONIC: z.string().min(1).optional(),
   COIN_TYPE: z.coerce.number().default(60), // BIP-44 coin type (60 = EVM/Base)
   WALLET_CHAIN: z.string().default('base'),

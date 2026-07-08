@@ -35,6 +35,7 @@ export function roleManager(): Contract {
   return new Contract(env.ROLE_MANAGER_ADDRESS as string, ROLE_MANAGER_ABI, relayer());
 }
 
+/** Read-only registry, bound to the provider (writes go via the forwarder). */
 export function batchRegistry(): Contract {
   return new Contract(env.BATCH_REGISTRY_ADDRESS as string, BATCH_REGISTRY_ABI, provider());
 }

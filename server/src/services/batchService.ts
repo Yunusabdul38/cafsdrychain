@@ -98,7 +98,7 @@ export async function createBatch(operatorId: string, input: CreateBatchInput) {
     include,
   });
 
-  // Write on-chain (skipped gracefully if chain disabled).
+  // Write on-chain, signed by the operator's derived wallet (gas paid by relayer).
   if (operator.wallet) {
     const res = await relayRegister(
       operator.wallet.index,
@@ -177,7 +177,7 @@ export async function advanceBatch(
     },
   });
 
-  // On-chain write via the operator's derived wallet (gas paid by relayer).
+  // On-chain write signed by the operator's derived wallet (gas paid by relayer).
   const index = batch.operator.wallet?.index;
   if (index !== undefined) {
     let res: RelayResult;
@@ -185,7 +185,7 @@ export async function advanceBatch(
     if (target === 'DRYING') {
       res = await relayDrying(index, batchId, facility, 1, batch.freshWeight, hash);
     } else if (target === 'DRIED') {
-      res = await relayDrying(index, batchId, facility, 2, (input.finalWeight ?? batch.freshWeight), hash);
+      res = await relayDrying(index, batchId, facility, 2, input.finalWeight ?? batch.freshWeight, hash);
     } else if (target === 'STORED') {
       res = await relayLogistics(index, batchId, facility, 3, hash);
     } else if (target === 'IN_TRANSIT') {

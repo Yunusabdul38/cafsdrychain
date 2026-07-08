@@ -10,7 +10,8 @@
     "dev": "tsx watch src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "keys": "tsx src/scripts/generateKeys.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.16.1",
