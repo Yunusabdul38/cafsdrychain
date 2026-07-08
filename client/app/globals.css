@@ -96,3 +96,66 @@ button {
     transform: translateY(-10px);
   }
 }
+
+/* Print styles for premium PDF generation */
+@media print {
+  /* Hide UI controls, sidebars, headers, and bottom navs */
+  aside,
+  header,
+  nav,
+  .print\:hidden,
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Remove sidebar layout offset */
+  .lg\:pl-64 {
+    padding-left: 0 !important;
+  }
+
+  /* Reset layout constraints for page rendering */
+  body {
+    background: #ffffff !important;
+    color: #0e3a17 !important;
+    font-size: 11pt !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .mx-auto {
+    max-width: 100% !important;
+  }
+
+  /* Page margins config */
+  @page {
+    margin: 1.5cm 1.2cm;
+  }
+
+  /* Premium border layout for print cards */
+  .Card, card {
+    page-break-inside: avoid !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  /* Layout headings */
+  h1, h2, h3, h4 {
+    color: #0e3a17 !important;
+    page-break-after: avoid !important;
+  }
+
+  /* Maintain side-by-side grid layouts in desktop PDF reports */
+  .grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 1.5rem !important;
+  }
+
+  .grid-cols-4, .lg\:grid-cols-4, .sm\:grid-cols-2 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}

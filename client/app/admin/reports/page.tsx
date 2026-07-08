@@ -46,7 +46,7 @@ export default function AdminReports() {
         <>
           <StatGrid stats={stats} />
 
-          <div className="mt-6">
+          <div className="mt-6 print:hidden">
             <Card className="p-5">
               <p className="text-sm font-semibold text-brand-dark">Generate a report</p>
               <p className="mb-4 mt-1 text-sm text-muted">

@@ -18,7 +18,7 @@ export default function PageHeader({
       {back && (
         <Link
           href={back.href}
-          className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted transition-colors hover:text-brand-dark"
+          className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted transition-colors hover:text-brand-dark print:hidden"
         >
           <ChevronLeftIcon className="h-4 w-4" />
           {back.label}
@@ -33,7 +33,7 @@ export default function PageHeader({
             <p className="mt-1 text-[15px] text-muted">{description}</p>
           )}
         </div>
-        {action && <div className="flex shrink-0 gap-2">{action}</div>}
+        {action && <div className="flex shrink-0 gap-2 print:hidden">{action}</div>}
       </div>
     </div>
   );
