@@ -3,6 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+export type ApiStage =
+  | "REGISTERED"
+  | "DRYING"
+  | "DRIED"
+  | "STORED"
+  | "IN_TRANSIT"
+  | "DELIVERED";
+
 export type ApiBatch = {
   id: string;
   batchId: string;
@@ -13,12 +21,29 @@ export type ApiBatch = {
   freshWeight: number;
   finalWeight?: number | null;
   moisture?: number | null;
-  stage: "REGISTERED" | "DRYING" | "DRIED" | "STORED" | "IN_TRANSIT" | "DELIVERED";
+  deliveryDate: string;
+  dryingStart?: string | null;
+  dryingEnd?: string | null;
+  quality?: string | null;
+  storageLocation?: string | null;
+  packaging?: string | null;
+  transport?: string | null;
+  destination?: string | null;
+  stage: ApiStage;
   location: string;
   chainStatus: "PENDING" | "CONFIRMED" | "FAILED";
   txHash?: string | null;
+  metadataHash?: string;
+  createdAt?: string;
   operator?: { id: string; name: string; location?: string | null };
-  events?: { stage: string; title: string; actor: string; createdAt: string; txHash?: string | null }[];
+  events?: {
+    stage: ApiStage;
+    title: string;
+    actor: string;
+    createdAt: string;
+    txHash?: string | null;
+    chainStatus?: string;
+  }[];
 };
 
 export function useBatches() {

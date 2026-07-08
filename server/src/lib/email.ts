@@ -2,6 +2,29 @@ import { resend } from './resend.js';
 import { env } from '../env.js';
 import { logger } from './logger.js';
 
+export async function sendPasswordResetEmail(to: string, name: string, link: string) {
+  if (!env.RESEND_API_KEY) {
+    logger.warn({ to, link }, 'RESEND_API_KEY not set — password reset link (dev only)');
+    return;
+  }
+  try {
+    await resend.emails.send({
+      from: 'gift@runescard.com',
+      to,
+      subject: 'Reset your CAFS DryChain password',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px">
+          <h2>Password reset</h2>
+          <p>Hi ${name}, we received a request to reset your password.</p>
+          <p><a href="${link}">Reset your password</a> (link expires in 1 hour).</p>
+          <p>If you didn't request this, you can safely ignore this email.</p>
+        </div>`,
+    });
+  } catch (err) {
+    logger.error({ err, to }, 'Failed to send password reset email');
+  }
+}
+
 export async function sendInviteEmail(to: string, name: string, tempPassword: string) {
   if (!env.RESEND_API_KEY) {
     logger.warn({ to }, 'RESEND_API_KEY not set — skipping invite email');
@@ -9,7 +32,7 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
   }
   try {
     await resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: 'gift@runescard.com',
       to,
       subject: 'Your CAFS DryChain account',
       html: `

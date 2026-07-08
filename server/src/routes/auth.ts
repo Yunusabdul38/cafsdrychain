@@ -4,7 +4,12 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
-import { loginSchema, changePasswordSchema } from '../schemas/index.js';
+import {
+  loginSchema,
+  changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from '../schemas/index.js';
 import * as authService from '../services/authService.js';
 import { env } from '../env.js';
 import { AppError } from '../middleware/error.js';
@@ -50,6 +55,27 @@ router.post(
     const token = req.cookies?.[REFRESH_COOKIE] ?? req.body?.refreshToken;
     if (token) await authService.logout(token);
     res.clearCookie(REFRESH_COOKIE, { ...cookieOptions, maxAge: undefined });
+    res.json({ ok: true });
+  })
+);
+
+router.post(
+  '/forgot-password',
+  authLimiter,
+  validate({ body: forgotPasswordSchema }),
+  asyncHandler(async (req, res) => {
+    await authService.requestPasswordReset(req.body.email);
+    // Always the same response — never reveal whether the email exists.
+    res.json({ ok: true });
+  })
+);
+
+router.post(
+  '/reset-password',
+  authLimiter,
+  validate({ body: resetPasswordSchema }),
+  asyncHandler(async (req, res) => {
+    await authService.resetPassword(req.body.token, req.body.newPassword);
     res.json({ ok: true });
   })
 );

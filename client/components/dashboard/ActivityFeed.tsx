@@ -1,34 +1,19 @@
 import Link from "next/link";
-import { batches } from "@/lib/mock-data";
 import { relativeTime } from "@/lib/utils";
 import { CheckIcon } from "@/components/icons";
 
-type Item = {
+export type ActivityItem = {
   title: string;
   batchId: string;
   actor: string;
   timestamp: string;
 };
 
-export function recentActivity(limit = 6): Item[] {
-  return batches
-    .flatMap((b) =>
-      b.timeline.map((t) => ({
-        title: t.title,
-        batchId: b.id,
-        actor: t.actor,
-        timestamp: t.timestamp,
-      }))
-    )
-    .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
-    .slice(0, limit);
-}
-
 export default function ActivityFeed({
   items,
   basePath,
 }: {
-  items: Item[];
+  items: ActivityItem[];
   basePath: string;
 }) {
   return (

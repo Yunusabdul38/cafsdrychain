@@ -67,7 +67,10 @@ export default function LoginForm() {
             placeholder="••••••••"
           />
           <div className="mt-2 flex items-center justify-end text-sm">
-            <Link href="#" className="font-medium text-brand hover:underline">
+            <Link
+              href="/forgot-password"
+              className="font-medium text-brand hover:underline"
+            >
               Forgot password?
             </Link>
           </div>
@@ -83,7 +86,7 @@ export default function LoginForm() {
         <br />
         Need access?{" "}
         <Link
-          href="mailto:admin@cafsdrychain.io"
+          href="#"
           className="font-semibold text-brand hover:underline"
         >
           Contact your admin

@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { batches, getBatch } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { SearchIcon, QrIcon } from "@/components/icons";
 
@@ -15,20 +14,14 @@ export default function VerifyLookup({
 }) {
   const router = useRouter();
   const [value, setValue] = useState("");
-  const [error, setError] = useState(false);
+  const dark = variant === "dark";
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = value.trim();
-    if (getBatch(id)) {
-      router.push(`${basePath}/${id.toUpperCase()}`);
-    } else {
-      setError(true);
-    }
+    const id = value.trim().toUpperCase();
+    // The result page fetches from the API and shows a not-found state itself.
+    if (id) router.push(`${basePath}/${id}`);
   };
-
-  const dark = variant === "dark";
-  const samples = batches.slice(0, 4).map((b) => b.id);
 
   return (
     <div>
@@ -41,10 +34,7 @@ export default function VerifyLookup({
           />
           <input
             value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setError(false);
-            }}
+            onChange={(e) => setValue(e.target.value)}
             placeholder="Enter Batch ID e.g. DRY-2K7F-9X1"
             className={
               dark
@@ -53,36 +43,10 @@ export default function VerifyLookup({
             }
           />
         </div>
-        <Button type="submit" size="lg">
+        <Button type="submit" size="lg" disabled={!value.trim()}>
           <QrIcon className="h-5 w-5" /> Verify
         </Button>
       </form>
-
-      {error && (
-        <p className="mt-2 text-sm text-red-500">
-          No batch found with that ID. Try one of the samples below.
-        </p>
-      )}
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className={`text-xs ${dark ? "text-white/60" : "text-muted"}`}>
-          Try:
-        </span>
-        {samples.map((id) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => router.push(`${basePath}/${id}`)}
-            className={
-              dark
-                ? "rounded-full border border-white/15 px-3 py-1 font-mono text-xs text-white/80 hover:bg-white/10"
-                : "rounded-full border border-black/[0.12] px-3 py-1 font-mono text-xs text-brand hover:bg-mint"
-            }
-          >
-            {id}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

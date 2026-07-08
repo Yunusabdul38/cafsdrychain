@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import { navByRole, roleMeta, type NavItem } from "@/lib/nav";
+import { useAuthStore } from "@/lib/store/auth";
+import { useLogout } from "@/lib/hooks/useAuth";
 import Logo from "@/components/ui/Logo";
+import { LoadingState } from "@/components/dashboard/States";
 import { BellIcon, LogoutIcon, PlusIcon } from "@/components/icons";
 
 export default function DashboardShell({
@@ -17,12 +20,36 @@ export default function DashboardShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, status } = useAuthStore();
+  const logout = useLogout();
   const nav = navByRole[role];
   const meta = roleMeta[role];
 
+  // Auth + role guard.
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace(`/login`);
+    } else if (status === "authenticated" && user && user.role !== role) {
+      router.replace(user.role === "admin" ? "/admin" : "/operator");
+    }
+  }, [status, user, role, router]);
+
+  if (status !== "authenticated" || !user || user.role !== role) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#f6f8f4]">
+        <LoadingState label="Loading your workspace…" />
+      </div>
+    );
+  }
+
+  const onLogout = async () => {
+    await logout.mutateAsync().catch(() => {});
+    router.replace("/login");
+  };
+
   const isActive = (href: string) =>
-    pathname === href ||
-    (href !== meta.home && pathname.startsWith(href + "/"));
+    pathname === href || (href !== meta.home && pathname.startsWith(href + "/"));
 
   const mobileItems = nav.filter((n) => n.mobile);
 
@@ -48,27 +75,28 @@ export default function DashboardShell({
 
         <div className="border-t border-black/[0.06] p-3">
           <div className="flex items-center gap-3 rounded-2xl px-3 py-2.5">
-            <Avatar name={meta.user.name} />
+            <Avatar name={user.name} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-brand-dark">
-                {meta.user.name}
+                {user.name}
               </p>
-              <p className="truncate text-xs text-muted">{meta.user.location}</p>
+              <p className="truncate text-xs text-muted">
+                {user.location ?? user.email}
+              </p>
             </div>
-            <Link
-              href="/login"
+            <button
+              onClick={onLogout}
               aria-label="Log out"
               className="text-muted transition-colors hover:text-brand-dark"
             >
               <LogoutIcon className="h-5 w-5" />
-            </Link>
+            </button>
           </div>
         </div>
       </aside>
 
       {/* Main column */}
       <div className="lg:pl-64">
-        {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-black/[0.08] bg-white px-4 sm:px-6">
           <div className="lg:hidden">
             <Logo href={meta.home} />
@@ -77,7 +105,7 @@ export default function DashboardShell({
             <p className="text-sm text-muted">
               Welcome back,{" "}
               <span className="font-medium text-brand-dark">
-                {meta.user.name.split(" ")[0]}
+                {user.name.split(" ")[0]}
               </span>
             </p>
           </div>
@@ -91,12 +119,11 @@ export default function DashboardShell({
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand" />
             </button>
             <div className="hidden items-center gap-2 sm:flex lg:hidden">
-              <Avatar name={meta.user.name} />
+              <Avatar name={user.name} />
             </div>
           </div>
         </header>
 
-        {/* Page content */}
         <main className="px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-10">
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>

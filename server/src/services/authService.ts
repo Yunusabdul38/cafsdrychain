@@ -6,6 +6,8 @@ import {
   hashRefreshToken,
   refreshExpiry,
 } from '../lib/jwt.js';
+import { sendPasswordResetEmail } from '../lib/email.js';
+import { env } from '../env.js';
 import { AppError } from '../middleware/error.js';
 
 const publicUser = {
@@ -81,4 +83,50 @@ export async function changePassword(userId: string, current: string, next: stri
 
 export function me(userId: string) {
   return prisma.user.findUnique({ where: { id: userId }, select: publicUser });
+}
+
+/**
+ * Begin a password reset. Always resolves the same way (no user enumeration).
+ * Emails a single-use, 1-hour token when the account exists and is active.
+ */
+export async function requestPasswordReset(email: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || user.status !== 'ACTIVE') return;
+
+  // Invalidate any outstanding reset tokens for this user.
+  await prisma.passwordResetToken.updateMany({
+    where: { userId: user.id, used: false },
+    data: { used: true },
+  });
+
+  const { token, hash } = generateRefreshToken();
+  await prisma.passwordResetToken.create({
+    data: {
+      tokenHash: hash,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    },
+  });
+
+  const link = `${env.APP_URL}/reset-password?token=${token}`;
+  await sendPasswordResetEmail(user.email, user.name, link);
+}
+
+export async function resetPassword(rawToken: string, newPassword: string) {
+  const hash = hashRefreshToken(rawToken);
+  const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hash } });
+
+  if (!record || record.used || record.expiresAt < new Date()) {
+    throw new AppError(400, 'This reset link is invalid or has expired');
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: record.userId },
+      data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false },
+    }),
+    prisma.passwordResetToken.update({ where: { id: record.id }, data: { used: true } }),
+    // Sign out everywhere after a reset.
+    prisma.refreshToken.updateMany({ where: { userId: record.userId }, data: { revoked: true } }),
+  ]);
 }

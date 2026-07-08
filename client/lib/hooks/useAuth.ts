@@ -33,3 +33,17 @@ export function useChangePassword() {
       api.post("/api/auth/change-password", input),
   });
 }
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (input: { email: string }) =>
+      api.post<{ ok: true }>("/api/auth/forgot-password", input, { auth: false }),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (input: { token: string; newPassword: string }) =>
+      api.post<{ ok: true }>("/api/auth/reset-password", input, { auth: false }),
+  });
+}

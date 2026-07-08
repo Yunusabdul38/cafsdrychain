@@ -16,7 +16,14 @@ function Row({ label, value }: { label: string; value?: string | number }) {
   );
 }
 
-export default function PublicRecord({ batch }: { batch: Batch }) {
+export default function PublicRecord({
+  batch,
+  onChainValid,
+}: {
+  batch: Batch;
+  onChainValid?: boolean;
+}) {
+  const verified = batch.verified || onChainValid;
   return (
     <div>
       <Link
@@ -26,15 +33,30 @@ export default function PublicRecord({ batch }: { batch: Batch }) {
         <ChevronLeftIcon className="h-4 w-4" /> Verify another
       </Link>
 
-      {/* Verified banner (flat) */}
-      <div className="flex items-center gap-4 rounded-2xl border border-brand/30 bg-mint/60 p-5">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+      {/* Verification banner — reflects real chain status */}
+      <div
+        className={
+          verified
+            ? "flex items-center gap-4 rounded-2xl border border-brand/30 bg-mint/60 p-5"
+            : "flex items-center gap-4 rounded-2xl border border-[#B4740B]/30 bg-[#FFF3E0] p-5"
+        }
+      >
+        <span
+          className={
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white " +
+            (verified ? "bg-brand" : "bg-[#B4740B]")
+          }
+        >
           <CheckIcon className="h-6 w-6" />
         </span>
         <div className="min-w-0">
-          <p className="font-semibold text-brand-dark">Authentic & verified</p>
+          <p className="font-semibold text-brand-dark">
+            {verified ? "Authentic & verified" : "Recorded — pending confirmation"}
+          </p>
           <p className="text-sm text-muted">
-            This product&apos;s history is secured on the Base blockchain.
+            {verified
+              ? "This product's history is secured on the Base blockchain."
+              : "This record exists and is awaiting on-chain confirmation."}
           </p>
         </div>
       </div>

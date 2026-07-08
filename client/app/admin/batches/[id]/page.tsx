@@ -1,6 +1,4 @@
-import { notFound } from "next/navigation";
-import BatchDetail from "@/components/dashboard/BatchDetail";
-import { getBatch } from "@/lib/mock-data";
+import BatchDetailLive from "@/components/dashboard/BatchDetailLive";
 
 export default async function AdminBatchPage({
   params,
@@ -8,7 +6,5 @@ export default async function AdminBatchPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const batch = getBatch(id);
-  if (!batch) notFound();
-  return <BatchDetail batch={batch} basePath="/admin/batches" />;
+  return <BatchDetailLive id={id} basePath="/admin/batches" />;
 }

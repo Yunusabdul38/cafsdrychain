@@ -200,6 +200,37 @@ contract BatchRegistry is
         onlyRole(roleManager.DEFAULT_ADMIN_ROLE())
     {}
 
+    // --------------------------------------------- ERC2771 / Context resolution
+    function _msgSender()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (address)
+    {
+        return ERC2771ContextUpgradeable._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        return ERC2771ContextUpgradeable._msgData();
+    }
+
+    function _contextSuffixLength()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (uint256)
+    {
+        return ERC2771ContextUpgradeable._contextSuffixLength();
+    }
+
     /// @dev Reserved storage for future upgrades.
     uint256[48] private __gap;
 }

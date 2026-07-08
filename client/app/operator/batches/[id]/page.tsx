@@ -1,6 +1,4 @@
-import { notFound } from "next/navigation";
-import BatchDetail from "@/components/dashboard/BatchDetail";
-import { getBatch } from "@/lib/mock-data";
+import BatchDetailLive from "@/components/dashboard/BatchDetailLive";
 
 export default async function OperatorBatchPage({
   params,
@@ -8,9 +6,5 @@ export default async function OperatorBatchPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const batch = getBatch(id);
-  if (!batch) notFound();
-  return (
-    <BatchDetail batch={batch} basePath="/operator/batches" canAct />
-  );
+  return <BatchDetailLive id={id} basePath="/operator/batches" canAct />;
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { products } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -8,6 +7,8 @@ import { Input, Select } from "@/components/ui/Field";
 import Button, { LinkButton } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/dashboard/PageHeader";
+import { useCreateBatch, type ApiBatch } from "@/lib/hooks/useBatches";
+import { ApiError } from "@/lib/api";
 import { CheckIcon, QrIcon, LinkIcon } from "@/components/icons";
 
 type Form = {
@@ -22,17 +23,11 @@ type Form = {
 
 const steps = ["Produce details", "Source & delivery", "Review"];
 
-function newBatchId() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
-  const seg = (n: number) =>
-    Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `DRY-${seg(4)}-${seg(3)}`;
-}
-
 export default function RegisterWizard() {
+  const create = useCreateBatch();
   const [step, setStep] = useState(0);
-  const [done, setDone] = useState(false);
-  const [batchId] = useState(newBatchId());
+  const [created, setCreated] = useState<ApiBatch | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
 
   const [form, setForm] = useState<Form>({
@@ -47,6 +42,24 @@ export default function RegisterWizard() {
 
   const set = (k: keyof Form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const onRegister = async () => {
+    setError(null);
+    try {
+      const { batch } = await create.mutateAsync({
+        product: form.product,
+        sourceType: form.sourceType as "Farm" | "Market",
+        source: form.source,
+        supplier: form.supplier,
+        freshWeight: Number(form.freshWeight),
+        deliveryDate: form.deliveryDate,
+        location: form.facility,
+      });
+      setCreated(batch);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to register batch.");
+    }
+  };
+
   const canNext =
     step === 0
       ? !!form.product
@@ -54,7 +67,7 @@ export default function RegisterWizard() {
         ? !!form.source && !!form.supplier && !!form.freshWeight
         : true;
 
-  if (done) {
+  if (created) {
     return (
       <>
         <PageHeader title="Batch registered" />
@@ -63,11 +76,11 @@ export default function RegisterWizard() {
             <CheckIcon className="h-7 w-7" />
           </span>
           <h2 className="mt-4 text-xl font-semibold text-brand-dark">
-            {form.product} registered
+            {created.product} registered
           </h2>
           <p className="mt-1 text-sm text-muted">
-            A unique Batch ID and QR code were generated and the record was
-            written to the Base blockchain.
+            A unique Batch ID was generated and the record was written to the
+            registry{created.txHash ? " on Base" : ""}.
           </p>
 
           <div className="mt-5 rounded-2xl border border-black/[0.08] p-5">
@@ -75,7 +88,7 @@ export default function RegisterWizard() {
               Batch ID
             </p>
             <p className="mt-1 font-mono text-lg font-semibold text-brand-dark">
-              {batchId}
+              {created.batchId}
             </p>
             <div className="mt-4 flex items-center justify-center rounded-2xl border border-black/[0.08] bg-mint py-6">
               <QrIcon className="h-24 w-24 text-brand-dark" />
@@ -235,6 +248,11 @@ export default function RegisterWizard() {
               <LinkIcon className="h-5 w-5 shrink-0 text-brand" />
               A Batch ID + QR code will be generated and recorded on-chain.
             </div>
+            {error && (
+              <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </div>
+            )}
           </div>
         )}
 
@@ -251,8 +269,14 @@ export default function RegisterWizard() {
               Continue
             </Button>
           ) : (
-            <Button type="button" full size="lg" onClick={() => setDone(true)}>
-              Register batch
+            <Button
+              type="button"
+              full
+              size="lg"
+              disabled={create.isPending}
+              onClick={onRegister}
+            >
+              {create.isPending ? "Registering…" : "Register batch"}
             </Button>
           )}
           {step > 0 ? (

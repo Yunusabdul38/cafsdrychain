@@ -42,10 +42,22 @@ model User {
   passwordHash       String
   mustChangePassword Boolean        @default(true)
   wallet             Wallet?
-  batches            Batch[]        @relation("BatchOperator")
+  batches            Batch[]              @relation("BatchOperator")
   refreshTokens      RefreshToken[]
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  passwordResets     PasswordResetToken[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+}
+
+/// Hashed, single-use password-reset tokens.
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 /// One deterministic HD wallet per user. Private keys are NEVER stored —
@@ -119,6 +131,13 @@ model RefreshToken {
   userId    String
   expiresAt DateTime
   revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+/// Admin-managed list of solar drying hubs / locations.
+model Location {
+  id        String   @id @default(uuid())
+  name      String   @unique
   createdAt DateTime @default(now())
 }
 
