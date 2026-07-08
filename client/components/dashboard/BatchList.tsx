@@ -8,10 +8,12 @@ export default function BatchList({
   batches,
   basePath,
   showOperator = false,
+  showLocation = false,
 }: {
   batches: Batch[];
   basePath: string;
   showOperator?: boolean;
+  showLocation?: boolean;
 }) {
   if (batches.length === 0) {
     return (
@@ -45,6 +47,7 @@ export default function BatchList({
                 <p className="mt-1 text-xs text-muted">
                   {b.source} · {b.freshWeight} kg
                   {showOperator ? ` · ${b.operator}` : ""}
+                  {showLocation ? ` · ${b.location}` : ""}
                 </p>
               </div>
               <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
@@ -63,6 +66,9 @@ export default function BatchList({
               <th className="px-5 py-3 font-medium">Source</th>
               {showOperator && (
                 <th className="px-5 py-3 font-medium">Operator</th>
+              )}
+              {showLocation && (
+                <th className="px-5 py-3 font-medium">Facility</th>
               )}
               <th className="px-5 py-3 font-medium">Weight</th>
               <th className="px-5 py-3 font-medium">Delivered</th>
@@ -90,6 +96,9 @@ export default function BatchList({
                 <td className="px-5 py-3.5 text-muted">{b.source}</td>
                 {showOperator && (
                   <td className="px-5 py-3.5 text-muted">{b.operator}</td>
+                )}
+                {showLocation && (
+                  <td className="px-5 py-3.5 text-muted">{b.location}</td>
                 )}
                 <td className="px-5 py-3.5 text-muted">{b.freshWeight} kg</td>
                 <td className="px-5 py-3.5 text-muted">

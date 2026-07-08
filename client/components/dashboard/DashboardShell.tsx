@@ -44,7 +44,7 @@ export default function DashboardShell({
   }
 
   const onLogout = async () => {
-    await logout.mutateAsync().catch(() => {});
+    await logout.mutateAsync().catch(() => { });
     router.replace("/login");
   };
 
@@ -111,13 +111,13 @@ export default function DashboardShell({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            {/* <button
               aria-label="Notifications"
               className="relative flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.1] text-brand-dark transition-colors hover:bg-mint"
             >
               <BellIcon className="h-5 w-5" />
               <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-brand" />
-            </button>
+            </button> */}
             <div className="hidden items-center gap-2 sm:flex lg:hidden">
               <Avatar name={user.name} />
             </div>

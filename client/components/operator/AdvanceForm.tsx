@@ -106,7 +106,16 @@ export default function AdvanceForm({
               On-chain status
             </p>
             {done.txHash ? (
-              <p className="mt-1 break-all font-mono text-xs text-brand-dark">{done.txHash}</p>
+              <p className="mt-1 break-all font-mono text-xs text-brand-dark">
+                <a
+                  href={`https://sepolia.basescan.org/tx/${done.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand hover:underline"
+                >
+                  {done.txHash}
+                </a>
+              </p>
             ) : (
               <p className="mt-1 text-xs text-muted">
                 {done.chainStatus === "PENDING"

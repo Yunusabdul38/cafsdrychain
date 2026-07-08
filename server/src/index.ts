@@ -13,6 +13,7 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import batchRoutes from './routes/batches.js';
 import verifyRoutes from './routes/verify.js';
+import locationRoutes from './routes/locations.js';
 
 const app = express();
 
@@ -45,6 +46,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/verify', verifyRoutes);
+app.use('/api/locations', locationRoutes);
+
 
 app.use(notFound);
 app.use(errorHandler);

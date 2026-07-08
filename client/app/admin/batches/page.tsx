@@ -26,7 +26,7 @@ export default function AdminBatches() {
           description="Batches registered by operators will appear here."
         />
       ) : (
-        <BatchBrowser batches={batches} basePath="/admin/batches" showOperator />
+        <BatchBrowser batches={batches} basePath="/admin/batches" showOperator showLocation />
       )}
     </>
   );

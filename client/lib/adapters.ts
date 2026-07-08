@@ -105,6 +105,7 @@ export function buildLedger(list: ApiBatch[]): LedgerRecord[] {
         actor: e.actor,
         timestamp: e.createdAt,
         status: ledgerStatus(e.chainStatus, e.txHash),
+        location: b.location,
       }))
     )
     .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));

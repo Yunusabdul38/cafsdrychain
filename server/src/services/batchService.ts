@@ -107,7 +107,7 @@ export async function createBatch(operatorId: string, input: CreateBatchInput) {
       input.freshWeight,
       hash
     );
-    await persistChain(batch.id, res);
+    await persistChain(batch.id, res, true);
   }
 
   return getBatch(batchId);

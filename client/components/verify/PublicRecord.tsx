@@ -76,8 +76,12 @@ export default function PublicRecord({
               {batch.source} ({batch.sourceType}) · {batch.location}
             </p>
           </div>
-          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border border-black/[0.08] bg-mint">
-            <QrIcon className="h-16 w-16 text-brand-dark" />
+          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border border-black/[0.08] bg-mint p-2">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`${window.location.origin}/verify/${batch.id}`)}`}
+              alt={`QR code for ${batch.id}`}
+              className="h-20 w-20 bg-white p-1 rounded-lg"
+            />
           </div>
         </div>
         <div className="mt-6">

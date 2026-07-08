@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Input, Select } from "@/components/ui/Field";
@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { CheckIcon, MailIcon, LinkIcon } from "@/components/icons";
 import { useCreateUser, type ApiUser } from "@/lib/hooks/useUsers";
+import { useLocations } from "@/lib/hooks/useLocations";
 import { ApiError } from "@/lib/api";
 
 const roles: { id: Role; label: string; desc: string }[] = [
@@ -18,12 +19,19 @@ const roles: { id: Role; label: string; desc: string }[] = [
 
 export default function AddUserForm() {
   const createUser = useCreateUser();
+  const { data: locations = [], isLoading: isLocsLoading } = useLocations();
   const [role, setRole] = useState<Role>("operator");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [location, setLocation] = useState("Oyo Solar Hub");
+  const [location, setLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ user: ApiUser; tempPassword: string } | null>(null);
+
+  useEffect(() => {
+    if (locations.length > 0 && !location) {
+      setLocation(locations[0].name);
+    }
+  }, [locations, location]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,9 +75,6 @@ export default function AddUserForm() {
               </p>
               <p className="mt-1 break-all font-mono text-xs text-brand-dark">
                 {result.user.wallet.address}
-              </p>
-              <p className="mt-1 text-xs text-muted">
-                HD index {result.user.wallet.index} · {result.user.wallet.derivationPath}
               </p>
             </div>
           )}
@@ -160,11 +165,19 @@ export default function AddUserForm() {
             label="Location"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
+            disabled={isLocsLoading}
           >
-            <option>Oyo Solar Hub</option>
-            <option>Kano Solar Hub</option>
-            <option>Kaduna Solar Hub</option>
-            <option>HQ · Ibadan</option>
+            {isLocsLoading ? (
+              <option value="">Loading locations...</option>
+            ) : locations.length === 0 ? (
+              <option value="">No locations available</option>
+            ) : (
+              locations.map((loc) => (
+                <option key={loc.id} value={loc.name}>
+                  {loc.name}
+                </option>
+              ))
+            )}
           </Select>
 
           <div className="flex items-center gap-2 rounded-2xl border border-black/[0.08] bg-mint/40 px-4 py-3 text-sm text-brand-dark">

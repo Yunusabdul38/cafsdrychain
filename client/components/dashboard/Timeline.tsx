@@ -34,9 +34,19 @@ export default function Timeline({ events }: { events: TimelineEvent[] }) {
                 ))}
               </ul>
             )}
-            <p className="mt-2 font-mono text-[11px] text-muted">
-              tx {e.txHash}
-            </p>
+            {e.txHash && (
+              <p className="mt-2 font-mono text-[11px] text-muted break-all">
+                tx{" "}
+                <a
+                  href={`https://sepolia.basescan.org/tx/${e.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand hover:underline"
+                >
+                  {e.txHash}
+                </a>
+              </p>
+            )}
           </div>
         </li>
       ))}
