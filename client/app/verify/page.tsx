@@ -24,7 +24,7 @@ export default function VerifyPage() {
         </p>
       </div>
 
-      <Card className="mx-auto mt-8 max-w-2xl p-5 sm:p-6">
+      <Card className="mx-auto mt-8 max-w-3xl p-5 sm:p-6">
         <VerifyLookup basePath="/verify" />
       </Card>
 
