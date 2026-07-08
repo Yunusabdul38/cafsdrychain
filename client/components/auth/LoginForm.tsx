@@ -3,28 +3,32 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Role } from "@/lib/types";
-import { roleMeta } from "@/lib/nav";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
-
-const roles: { id: Role; label: string }[] = [
-  { id: "operator", label: "Operator" },
-  { id: "admin", label: "Admin" },
-  { id: "auditor", label: "Auditor" },
-];
+import { useLogin } from "@/lib/hooks/useAuth";
+import { ApiError } from "@/lib/api";
 
 export default function LoginForm() {
   const router = useRouter();
-  const [role, setRole] = useState<Role>("operator");
-  const [loading, setLoading] = useState(false);
+  const login = useLogin();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    // Frontend demo — route to the selected role's dashboard
-    setTimeout(() => router.push(roleMeta[role].home), 350);
+    setError(null);
+    try {
+      const { user } = await login.mutateAsync({ email, password });
+      // Route by the role the backend assigned — not a client-side choice.
+      router.push(user.role === "admin" ? "/admin" : "/operator");
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Unable to reach the server. Please try again."
+      );
+    }
   };
 
   return (
@@ -36,36 +40,20 @@ export default function LoginForm() {
         Sign in to your CAFS DryChain workspace.
       </p>
 
-      {/* Role selector */}
-      <div className="mt-7">
-        <p className="mb-2 text-sm font-medium text-brand-dark">Sign in as</p>
-        <div className="grid grid-cols-3 gap-2 rounded-2xl border border-black/[0.1] p-1">
-          {roles.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setRole(r.id)}
-              className={cn(
-                "rounded-xl py-2.5 text-sm font-semibold transition-colors",
-                role === r.id
-                  ? "bg-brand-dark text-white"
-                  : "text-brand-dark/70 hover:bg-mint"
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
+      {error && (
+        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
         </div>
-      </div>
+      )}
 
-      <form onSubmit={onSubmit} className="mt-5 space-y-4">
+      <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <Input
           id="email"
           label="Email"
           type="email"
           required
-          defaultValue={roleMeta[role].user.email}
-          key={role}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           placeholder="you@cafsdrychain.io"
         />
         <div>
@@ -74,26 +62,19 @@ export default function LoginForm() {
             label="Password"
             type="password"
             required
-            defaultValue="demo1234"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
           />
-          <div className="mt-2 flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 text-muted">
-              <input
-                type="checkbox"
-                defaultChecked
-                className="h-4 w-4 rounded border-black/20 accent-brand"
-              />
-              Remember me
-            </label>
+          <div className="mt-2 flex items-center justify-end text-sm">
             <Link href="#" className="font-medium text-brand hover:underline">
               Forgot password?
             </Link>
           </div>
         </div>
 
-        <Button type="submit" full size="lg" disabled={loading}>
-          {loading ? "Signing in…" : `Sign in as ${roleMeta[role].title}`}
+        <Button type="submit" full size="lg" disabled={login.isPending}>
+          {login.isPending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 

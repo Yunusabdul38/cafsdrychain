@@ -1,71 +1,63 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import { prisma } from './lib/prisma.js';
-import { resend } from './lib/resend.js';
-
-dotenv.config();
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import { pinoHttp } from 'pino-http';
+import { env, corsOrigins } from './env.js';
+import { logger } from './lib/logger.js';
+import { globalLimiter } from './middleware/rateLimit.js';
+import { errorHandler, notFound } from './middleware/error.js';
+import { ensureWalletCounter } from './services/walletService.js';
+import { chainEnabled } from './chain/client.js';
+import authRoutes from './routes/auth.js';
+import userRoutes from './routes/users.js';
+import batchRoutes from './routes/batches.js';
+import verifyRoutes from './routes/verify.js';
 
 const app = express();
-const port = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(express.json());
+// Behind a proxy (Render/Fly/NGINX) so rate-limit & secure cookies see real IPs.
+app.set('trust proxy', 1);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+// --- Security middleware -------------------------------------------------
+app.use(helmet());
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Allow same-origin / server-to-server (no origin) and the allowlist.
+      if (!origin || corsOrigins.includes(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '100kb' })); // bound body size
+app.use(cookieParser());
+app.use(pinoHttp({ logger }));
+app.use(globalLimiter);
+
+// --- Routes --------------------------------------------------------------
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', chain: chainEnabled() ? 'enabled' : 'off', timestamp: new Date() });
 });
 
-// Get all users (sanity check for Prisma)
-app.get('/api/users', async (req, res) => {
-  try {
-    const users = await prisma.user.findMany();
-    res.json(users);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch users from database' });
-  }
-});
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/batches', batchRoutes);
+app.use('/api/verify', verifyRoutes);
 
-// Create a user
-app.post('/api/users', async (req, res) => {
-  const { email, name } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
-  }
-  try {
-    const user = await prisma.user.create({
-      data: { email, name },
-    });
-    res.status(201).json(user);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to create user' });
-  }
-});
+app.use(notFound);
+app.use(errorHandler);
 
-// Send a test email via Resend
-app.post('/api/send-email', async (req, res) => {
-  const { to, subject, html } = req.body;
-  if (!to || !subject || !html) {
-    return res.status(400).json({ error: 'Missing required fields: to, subject, html' });
-  }
+async function start() {
+  await ensureWalletCounter();
+  app.listen(env.PORT, () => {
+    logger.info(`Server running on port ${env.PORT} (${env.NODE_ENV})`);
+    logger.info(`On-chain integration: ${chainEnabled() ? 'ENABLED' : 'disabled'}`);
+  });
+}
 
-  try {
-    const data = await resend.emails.send({
-      from: 'onboarding@resend.dev', // Default sender for sandbox
-      to,
-      subject,
-      html,
-    });
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to send email' });
-  }
-});
-
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+start().catch((err) => {
+  logger.error({ err }, 'Failed to start server');
+  process.exit(1);
 });

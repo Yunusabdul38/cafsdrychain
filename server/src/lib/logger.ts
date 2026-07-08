@@ -1,0 +1,23 @@
+import pino from 'pino';
+import { env } from '../env.js';
+
+export const logger = pino({
+  level: env.NODE_ENV === 'production' ? 'info' : 'debug',
+  // Never log secrets or tokens.
+  redact: {
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'password',
+      '*.password',
+      '*.passwordHash',
+      '*.privateKey',
+      '*.mnemonic',
+    ],
+    censor: '[redacted]',
+  },
+  transport:
+    env.NODE_ENV === 'development'
+      ? { target: 'pino-pretty', options: { colorize: true } }
+      : undefined,
+});
