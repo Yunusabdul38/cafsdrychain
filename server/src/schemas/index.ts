@@ -30,6 +30,10 @@ export const createUserSchema = z.object({
   location: z.string().min(2).max(120),
 });
 
+export const updateUserStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+});
+
 export const createLocationSchema = z.object({
   name: z.string().min(2, 'Location name must be at least 2 characters').max(100),
 });
@@ -63,6 +67,7 @@ export const batchIdParam = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type UpdateUserStatusInput = z.infer<typeof updateUserStatusSchema>;
 export type CreateLocationInput = z.infer<typeof createLocationSchema>;
 export type CreateBatchInput = z.infer<typeof createBatchSchema>;
 export type AdvanceBatchInput = z.infer<typeof advanceBatchSchema>;

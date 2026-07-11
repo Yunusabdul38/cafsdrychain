@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { createUserSchema } from '../schemas/index.js';
+import { createUserSchema, updateUserStatusSchema } from '../schemas/index.js';
 import * as userService from '../services/userService.js';
 
 const router = Router();
@@ -33,6 +33,23 @@ router.get(
     const user = await userService.getUser(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ user });
+  })
+);
+
+router.patch(
+  '/:id/status',
+  validate({ body: updateUserStatusSchema }),
+  asyncHandler(async (req, res) => {
+    const updated = await userService.updateUserStatus(req.params.id, req.body.status);
+    res.json({ user: updated });
+  })
+);
+
+router.delete(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const result = await userService.deleteUser(req.params.id);
+    res.json(result);
   })
 );
 

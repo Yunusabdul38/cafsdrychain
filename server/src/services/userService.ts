@@ -53,7 +53,7 @@ export async function createUser(input: CreateUserInput) {
   });
 
   // Best-effort side effects (must not roll back the DB record).
-  void sendInviteEmail(input.email, input.name, tempPassword);
+  void sendInviteEmail(input.email, input.name, tempPassword, input.role);
   if (input.role === 'OPERATOR' && withWallet?.wallet) {
     // Authorise the operator's EOA on-chain so its signatures are accepted.
     grantOperatorRoles(withWallet.wallet.address)
@@ -71,4 +71,44 @@ export function listUsers() {
 
 export function getUser(id: string) {
   return prisma.user.findUnique({ where: { id }, select: publicUser });
+}
+
+export async function updateUserStatus(id: string, status: 'ACTIVE' | 'INACTIVE') {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new AppError(404, 'User not found');
+  
+  const updated = await prisma.user.update({
+    where: { id },
+    data: { status },
+    select: publicUser
+  });
+  
+  return updated;
+}
+
+export async function deleteUser(id: string) {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new AppError(404, 'User not found');
+
+  // Check if the user has any associated batches as operator
+  const batchCount = await prisma.batch.count({ where: { operatorId: id } });
+
+  if (batchCount > 0) {
+    // Perform a soft delete: deactivate the user
+    await prisma.user.update({
+      where: { id },
+      data: { status: 'INACTIVE' }
+    });
+    return {
+      deleted: false,
+      message: 'Operator deactivated. The operator record is preserved because they have active or completed batches on-chain.'
+    };
+  }
+
+  // Hard delete since there are no batches linked
+  await prisma.user.delete({ where: { id } });
+  return {
+    deleted: true,
+    message: 'User deleted successfully.'
+  };
 }
