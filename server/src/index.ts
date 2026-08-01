@@ -61,7 +61,6 @@ app.use('/api/batches', batchRoutes);
 app.use('/api/verify', verifyRoutes);
 app.use('/api/locations', locationRoutes);
 
-
 app.use(notFound);
 app.use(errorHandler);
 

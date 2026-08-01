@@ -4,7 +4,6 @@ import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import Providers from "@/components/providers/Providers";
-import { PwaRegister } from "@/components/pwa/PwaRegister";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -77,7 +76,6 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <Providers>{children}</Providers>
-        <PwaRegister />
         <Analytics />
       </body>
     </html>
