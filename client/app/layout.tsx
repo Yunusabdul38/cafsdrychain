@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import Providers from "@/components/providers/Providers";
 
@@ -58,6 +59,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
