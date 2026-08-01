@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import Providers from "@/components/providers/Providers";
+import { PwaRegister } from "@/components/pwa/PwaRegister";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -41,10 +42,27 @@ const magnetik = localFont({
   variable: "--font-magnetik",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#47a81d",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   title: "CAFS DryChain — Every Batch. Verified. On-Chain.",
   description:
     "DryChain brings end-to-end traceability to solar-dried produce, tracking every batch from collection to delivery with an immutable record secured on the Base blockchain.",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "DryChain",
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/img/drychain-logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -59,6 +77,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <Providers>{children}</Providers>
+        <PwaRegister />
         <Analytics />
       </body>
     </html>
