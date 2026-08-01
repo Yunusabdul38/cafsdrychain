@@ -53,12 +53,18 @@ app.use(notFound);
 app.use(errorHandler);
 
 async function start() {
-  await ensureWalletCounter();
   const port = Number(process.env.PORT) || env.PORT;
   app.listen(port, '0.0.0.0', () => {
     logger.info(`Server running on port ${port} (${env.NODE_ENV})`);
     logger.info(`On-chain integration: ${chainEnabled() ? 'ENABLED' : 'disabled'}`);
   });
+
+  try {
+    await ensureWalletCounter();
+    logger.info('Wallet counter initialized successfully');
+  } catch (err) {
+    logger.error({ err }, 'Failed to initialize wallet counter — DB schema may need pushing');
+  }
 }
 
 start().catch((err) => {

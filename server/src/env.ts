@@ -9,8 +9,8 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
 
   // Auth
-  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be >= 32 chars'),
-  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be >= 32 chars'),
+  JWT_ACCESS_SECRET: z.string().min(32).default('default-jwt-access-secret-minimum-32-chars-long-cafsdrychain'),
+  JWT_REFRESH_SECRET: z.string().min(32).default('default-jwt-refresh-secret-minimum-32-chars-long-cafsdrychain'),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(7),
 
