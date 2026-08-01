@@ -27,9 +27,9 @@ const schema = z.object({
 
   // On-chain integration (optional — app works off-chain until these are set)
   CHAIN_ENABLED: z
-    .string()
+    .union([z.string(), z.boolean()])
     .default('false')
-    .transform((v) => v === 'true'),
+    .transform((v) => String(v) === 'true'),
   RPC_URL: z.string().optional(),
   CHAIN_ID: z.coerce.number().default(84532),
   ROLE_MANAGER_ADDRESS: z.string().optional(),
