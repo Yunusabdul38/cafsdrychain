@@ -81,6 +81,16 @@ router.post(
 );
 
 router.get(
+  '/verify-reset-token',
+  asyncHandler(async (req, res) => {
+    const token = req.query.token as string;
+    if (!token) return res.json({ valid: false, reason: 'missing' });
+    const result = await authService.verifyResetToken(token);
+    res.json(result);
+  })
+);
+
+router.get(
   '/me',
   requireAuth,
   asyncHandler(async (req, res) => {

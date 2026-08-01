@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
-import { useResetPassword } from "@/lib/hooks/useAuth";
+import { useResetPassword, useVerifyResetToken } from "@/lib/hooks/useAuth";
 import { ApiError } from "@/lib/api";
-import { CheckIcon } from "@/components/icons";
+import { CheckIcon, ClockIcon } from "@/components/icons";
 
 export default function ResetPasswordForm() {
   const router = useRouter();
   const token = useSearchParams().get("token") ?? "";
+  const { data: tokenStatus, isLoading: isVerifying } = useVerifyResetToken(token);
   const reset = useResetPassword();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -46,6 +47,46 @@ export default function ResetPasswordForm() {
           className="mt-6 inline-block text-sm font-semibold text-brand hover:underline"
         >
           Request a new link
+        </Link>
+      </div>
+    );
+  }
+
+  if (isVerifying) {
+    return (
+      <div className="py-4">
+        <h1 className="text-3xl font-semibold tracking-tight text-brand-dark">
+          Verifying reset link…
+        </h1>
+        <p className="mt-2 text-[15px] text-muted">Please wait while we check your link status.</p>
+      </div>
+    );
+  }
+
+  if (tokenStatus && !tokenStatus.valid) {
+    const isExpired = tokenStatus.reason === "expired";
+    const isUsed = tokenStatus.reason === "used";
+
+    return (
+      <div>
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600">
+          <ClockIcon className="h-7 w-7" />
+        </span>
+        <h1 className="mt-5 text-3xl font-semibold tracking-tight text-brand-dark">
+          {isExpired ? "Link expired" : isUsed ? "Link already used" : "Invalid link"}
+        </h1>
+        <p className="mt-2 text-[15px] text-muted">
+          {isExpired
+            ? "This password reset link has expired for security reasons. Please request a new one."
+            : isUsed
+            ? "This password reset link has already been used to change your password."
+            : "This password reset link is invalid or malformed."}
+        </p>
+        <Link
+          href="/forgot-password"
+          className="mt-6 inline-block text-sm font-semibold text-brand hover:underline"
+        >
+          Request a new reset link
         </Link>
       </div>
     );

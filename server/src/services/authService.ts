@@ -130,3 +130,17 @@ export async function resetPassword(rawToken: string, newPassword: string) {
     prisma.refreshToken.updateMany({ where: { userId: record.userId }, data: { revoked: true } }),
   ]);
 }
+
+export async function verifyResetToken(rawToken: string) {
+  const hash = hashRefreshToken(rawToken);
+  const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hash } });
+
+  if (!record || record.used || record.expiresAt < new Date()) {
+    return {
+      valid: false,
+      reason: !record ? 'invalid' : record.used ? 'used' : 'expired',
+    };
+  }
+
+  return { valid: true };
+}

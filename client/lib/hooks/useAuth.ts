@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuthStore, normalizeUser, type AuthUser } from "@/lib/store/auth";
 
@@ -45,5 +45,18 @@ export function useResetPassword() {
   return useMutation({
     mutationFn: (input: { token: string; newPassword: string }) =>
       api.post<{ ok: true }>("/api/auth/reset-password", input, { auth: false }),
+  });
+}
+
+export function useVerifyResetToken(token: string) {
+  return useQuery({
+    queryKey: ["verify-reset-token", token],
+    queryFn: () =>
+      api.get<{ valid: boolean; reason?: string }>(
+        `/api/auth/verify-reset-token?token=${encodeURIComponent(token)}`,
+        { auth: false }
+      ),
+    enabled: Boolean(token),
+    staleTime: Infinity,
   });
 }
