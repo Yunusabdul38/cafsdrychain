@@ -27,7 +27,7 @@ app.use(
     origin(origin, cb) {
       // Allow same-origin / server-to-server (no origin) and the allowlist.
       if (!origin || corsOrigins.includes(origin)) return cb(null, true);
-      cb(new Error('Not allowed by CORS'));
+      cb(null, false);
     },
     credentials: true,
   })

@@ -10,12 +10,23 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Admins see all batches; operators see only their own.
+// Admins see all batches; operators see all batches at their hub (location).
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const filter =
-      req.user!.role === 'OPERATOR' ? { operatorId: req.user!.sub } : undefined;
+    let filter: { operatorId?: string; location?: string } | undefined;
+    if (req.user!.role === 'OPERATOR') {
+      // Fetch the operator's location so we can scope to their hub.
+      const me = await prisma.user.findUnique({
+        where: { id: req.user!.sub },
+        select: { location: true },
+      });
+      // If the operator has a location, show all batches at that hub.
+      // If for some reason location is null, fall back to only their own.
+      filter = me?.location
+        ? { location: me.location }
+        : { operatorId: req.user!.sub };
+    }
     res.json({ batches: await batchService.listBatches(filter) });
   })
 );

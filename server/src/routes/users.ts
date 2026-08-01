@@ -22,8 +22,8 @@ router.post(
   validate({ body: createUserSchema }),
   asyncHandler(async (req, res) => {
     // Provisioning a user derives their deterministic wallet automatically.
-    const result = await userService.createUser(req.body);
-    res.status(201).json(result);
+    const { user } = await userService.createUser(req.body);
+    res.status(201).json({ user });
   })
 );
 
@@ -40,6 +40,9 @@ router.patch(
   '/:id/status',
   validate({ body: updateUserStatusSchema }),
   asyncHandler(async (req, res) => {
+    if (req.params.id === req.user?.sub) {
+      return res.status(400).json({ error: 'You cannot deactivate your own administrator account.' });
+    }
     const updated = await userService.updateUserStatus(req.params.id, req.body.status);
     res.json({ user: updated });
   })
@@ -48,6 +51,9 @@ router.patch(
 router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
+    if (req.params.id === req.user?.sub) {
+      return res.status(400).json({ error: 'You cannot delete your own administrator account.' });
+    }
     const result = await userService.deleteUser(req.params.id);
     res.json(result);
   })

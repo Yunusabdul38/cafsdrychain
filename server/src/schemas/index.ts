@@ -48,7 +48,13 @@ export const createBatchSchema = z.object({
   location: z.string().min(2).max(120),
 });
 
+export const BATCH_STAGES = ['REGISTERED', 'DRYING', 'DRIED', 'STORED', 'IN_TRANSIT', 'DELIVERED'] as const;
+export const BatchStageEnum = z.enum(BATCH_STAGES);
+
 export const advanceBatchSchema = z.object({
+  // Optimistic-lock guard: if supplied, the server rejects the advance if the
+  // batch has already moved past this stage (catches duplicate/concurrent submits).
+  expectedStage: BatchStageEnum.optional(),
   dryingStart: z.coerce.date().optional(),
   dryingEnd: z.coerce.date().optional(),
   finalWeight: z.number().positive().max(1_000_000).optional(),

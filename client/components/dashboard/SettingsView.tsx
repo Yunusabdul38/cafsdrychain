@@ -10,7 +10,7 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
-import { LoadingState } from "@/components/dashboard/States";
+import { LoadingState, Spinner } from "@/components/dashboard/States";
 import { LogoutIcon, CheckIcon } from "@/components/icons";
 
 export default function SettingsView() {
@@ -21,7 +21,9 @@ export default function SettingsView() {
 
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
   if (!user) return <LoadingState />;
 
@@ -31,13 +33,40 @@ export default function SettingsView() {
   const onChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
+    setFieldErrors({});
+
+    const newFieldErrors: Record<string, string[]> = {};
+    if (!current) {
+      newFieldErrors.current = ["Current password is required."];
+    }
+    if (next.length < 8) {
+      newFieldErrors.new = ["Password must be at least 8 characters."];
+    }
+    if (next !== confirm) {
+      newFieldErrors.confirm = ["Passwords do not match."];
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      return;
+    }
+
     try {
       await changePassword.mutateAsync({ currentPassword: current, newPassword: next });
       setMsg({ ok: true, text: "Password updated." });
       setCurrent("");
       setNext("");
+      setConfirm("");
     } catch (err) {
-      setMsg({ ok: false, text: err instanceof ApiError ? err.message : "Failed to update." });
+      if (err instanceof ApiError) {
+        if (err.details && typeof err.details === "object") {
+          setFieldErrors(err.details as Record<string, string[]>);
+        } else {
+          setMsg({ ok: false, text: err.message });
+        }
+      } else {
+        setMsg({ ok: false, text: "Failed to update." });
+      }
     }
   };
 
@@ -79,9 +108,11 @@ export default function SettingsView() {
             <div className="space-y-4 p-5">
               <Input id="name" label="Full name" defaultValue={user.name} disabled />
               <Input id="email" label="Email" defaultValue={user.email} disabled />
-              <p className="text-xs text-muted">
-                Profile details are managed by your administrator.
-              </p>
+              {user.role !== "admin" && (
+                <p className="text-xs text-muted">
+                  Profile details are managed by your administrator.
+                </p>
+              )}
             </div>
           </Card>
 
@@ -107,6 +138,7 @@ export default function SettingsView() {
                 onChange={(e) => setCurrent(e.target.value)}
                 placeholder="••••••••"
                 required
+                error={fieldErrors.current?.[0]}
               />
               <Input
                 id="new"
@@ -116,9 +148,27 @@ export default function SettingsView() {
                 onChange={(e) => setNext(e.target.value)}
                 placeholder="At least 8 characters"
                 required
+                error={fieldErrors.new?.[0]}
+              />
+              <Input
+                id="confirm"
+                type="password"
+                label="Confirm new password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="Confirm new password"
+                required
+                error={fieldErrors.confirm?.[0]}
               />
               <Button type="submit" variant="dark" disabled={changePassword.isPending}>
-                {changePassword.isPending ? "Updating…" : "Update password"}
+                {changePassword.isPending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Spinner className="h-5 w-5 animate-spin text-white" />
+                    Updating password…
+                  </span>
+                ) : (
+                  "Update password"
+                )}
               </Button>
             </form>
           </Card>

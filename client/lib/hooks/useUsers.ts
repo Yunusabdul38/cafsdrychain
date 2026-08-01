@@ -19,6 +19,8 @@ export function useUsers() {
   return useQuery({
     queryKey: ["users"],
     queryFn: () => api.get<{ users: ApiUser[] }>("/api/users").then((r) => r.users),
+    // Poll every 15 seconds so operator/admin lists stay live.
+    refetchInterval: 15_000,
   });
 }
 
@@ -31,7 +33,7 @@ export function useCreateUser() {
       role: Role;
       location: string;
     }) =>
-      api.post<{ user: ApiUser; tempPassword: string }>("/api/users", input),
+      api.post<{ user: ApiUser }>("/api/users", input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });
 }

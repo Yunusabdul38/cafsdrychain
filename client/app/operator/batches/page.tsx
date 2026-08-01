@@ -8,22 +8,26 @@ import { LoadingState, ErrorState, EmptyState } from "@/components/dashboard/Sta
 import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
 import { PlusIcon, ListIcon } from "@/components/icons";
+import { LiveIndicator } from "@/components/ui/LiveIndicator";
 
 export default function OperatorBatches() {
-  const { data, isLoading, isError, refetch } = useBatches();
+  const { data, isLoading, isError, refetch, dataUpdatedAt } = useBatches();
   const batches = useMemo(() => (data ? toUiBatches(data) : []), [data]);
 
   return (
     <>
-      <PageHeader
-        title="Batches"
-        description="Every batch registered at your hub."
-        action={
-          <LinkButton href="/operator/register">
-            <PlusIcon className="h-5 w-5" /> Register
-          </LinkButton>
-        }
-      />
+      <div className="flex items-start justify-between gap-3">
+        <PageHeader
+          title="Batches"
+          description="Every batch registered at your hub."
+          action={
+            <LinkButton href="/operator/register">
+              <PlusIcon className="h-5 w-5" /> Register
+            </LinkButton>
+          }
+        />
+        <LiveIndicator dataUpdatedAt={dataUpdatedAt} className="mt-1 shrink-0" />
+      </div>
       {isLoading ? (
         <LoadingState />
       ) : isError ? (

@@ -7,14 +7,18 @@ import { LoadingState, ErrorState, EmptyState } from "@/components/dashboard/Sta
 import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
 import { ListIcon } from "@/components/icons";
+import { LiveIndicator } from "@/components/ui/LiveIndicator";
 
 export default function AdminBatches() {
-  const { data, isLoading, isError, refetch } = useBatches();
+  const { data, isLoading, isError, refetch, dataUpdatedAt } = useBatches();
   const batches = useMemo(() => (data ? toUiBatches(data) : []), [data]);
 
   return (
     <>
-      <PageHeader title="All batches" description="Every batch across all hubs, in real time." />
+      <div className="flex items-start justify-between gap-3">
+        <PageHeader title="All batches" description="Every batch across all hubs, in real time." />
+        <LiveIndicator dataUpdatedAt={dataUpdatedAt} className="mt-1 shrink-0" />
+      </div>
       {isLoading ? (
         <LoadingState />
       ) : isError ? (

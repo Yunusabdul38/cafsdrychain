@@ -38,7 +38,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
+          queries: {
+            retry: 1,
+            // Always consider data stale so background refetches happen immediately.
+            staleTime: 0,
+            // Refetch when the user switches back to the tab.
+            refetchOnWindowFocus: true,
+            // Refetch after reconnecting from offline.
+            refetchOnReconnect: true,
+          },
         },
       })
   );

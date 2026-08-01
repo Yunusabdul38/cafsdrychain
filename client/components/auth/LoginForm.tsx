@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { useLogin } from "@/lib/hooks/useAuth";
 import { ApiError } from "@/lib/api";
+import { Spinner } from "@/components/dashboard/States";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -14,20 +15,42 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
+
+    const newFieldErrors: Record<string, string[]> = {};
+    if (!email.trim()) {
+      newFieldErrors.email = ["Email is required."];
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newFieldErrors.email = ["Please enter a valid email address."];
+    }
+    if (!password) {
+      newFieldErrors.password = ["Password is required."];
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      return;
+    }
+
     try {
       const { user } = await login.mutateAsync({ email, password });
       // Route by the role the backend assigned — not a client-side choice.
       router.push(user.role === "admin" ? "/admin" : "/operator");
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Unable to reach the server. Please try again."
-      );
+      if (err instanceof ApiError) {
+        if (err.details && typeof err.details === "object") {
+          setFieldErrors(err.details as Record<string, string[]>);
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Unable to reach the server. Please try again.");
+      }
     }
   };
 
@@ -55,6 +78,7 @@ export default function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@cafsdrychain.io"
+          error={fieldErrors.email?.[0]}
         />
         <div>
           <Input
@@ -65,6 +89,7 @@ export default function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
+            error={fieldErrors.password?.[0]}
           />
           <div className="mt-2 flex items-center justify-end text-sm">
             <Link
@@ -77,7 +102,14 @@ export default function LoginForm() {
         </div>
 
         <Button type="submit" full size="lg" disabled={login.isPending}>
-          {login.isPending ? "Signing in…" : "Sign in"}
+          {login.isPending ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner className="h-5 w-5 animate-spin text-white" />
+              Signing in…
+            </span>
+          ) : (
+            "Sign in"
+          )}
         </Button>
       </form>
 

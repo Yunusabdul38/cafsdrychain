@@ -72,12 +72,17 @@ export async function sendPasswordResetEmail(to: string, name: string, link: str
   `;
 
   try {
-    await resend.emails.send({
-      from: 'gift@runescard.com',
+    const { data, error } = await resend.emails.send({
+      from: 'cafsdrychain@cafsdrychain.com',
       to,
       subject: 'Reset your CAFS DryChain password',
       html: htmlContent,
     });
+    if (error) {
+      logger.error({ error, to }, 'Resend API returned error when sending password reset email');
+    } else {
+      logger.info({ id: data?.id, to }, 'Successfully sent password reset email via Resend');
+    }
   } catch (err) {
     logger.error({ err, to }, 'Failed to send password reset email');
   }
@@ -141,6 +146,9 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
                 <td style="font-size: 14px; color: #4a5568; line-height: 1.6;">
                   <strong>Email:</strong> <span style="font-family: monospace; color: #0c3227; font-size: 14px;">${to}</span><br />
                   <strong>Temporary Password:</strong> <code style="background-color: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 14px; color: #0c3227;">${tempPassword}</code>
+                  <p style="color: #c53030; font-size: 13px; font-weight: 600; margin-top: 8px; margin-bottom: 0; line-height: 1.4;">
+                    ⚠️ Important: For security reasons, you must reset this temporary password immediately after logging in.
+                  </p>
                 </td>
               </tr>
             </table>
@@ -172,12 +180,17 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
   `;
 
   try {
-    await resend.emails.send({
-      from: 'gift@runescard.com',
+    const { data, error } = await resend.emails.send({
+      from: 'cafsdrychain@cafsdrychain.com',
       to,
       subject: 'Your CAFS DryChain account invitation',
       html: htmlContent,
     });
+    if (error) {
+      logger.error({ error, to }, 'Resend API returned error when sending invite email');
+    } else {
+      logger.info({ id: data?.id, to }, 'Successfully sent invite email via Resend');
+    }
   } catch (err) {
     logger.error({ err, to }, 'Failed to send invite email');
   }

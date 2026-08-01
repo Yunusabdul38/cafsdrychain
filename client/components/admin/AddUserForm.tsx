@@ -11,6 +11,7 @@ import { CheckIcon, MailIcon, LinkIcon } from "@/components/icons";
 import { useCreateUser, type ApiUser } from "@/lib/hooks/useUsers";
 import { useLocations } from "@/lib/hooks/useLocations";
 import { ApiError } from "@/lib/api";
+import { Spinner } from "@/components/dashboard/States";
 
 const roles: { id: Role; label: string; desc: string }[] = [
   { id: "operator", label: "Operator", desc: "Registers & updates batches" },
@@ -25,7 +26,8 @@ export default function AddUserForm() {
   const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ user: ApiUser; tempPassword: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [result, setResult] = useState<{ user: ApiUser } | null>(null);
 
   useEffect(() => {
     if (locations.length > 0 && !location) {
@@ -36,16 +38,49 @@ export default function AddUserForm() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
+
+    const newFieldErrors: Record<string, string[]> = {};
+    if (!name.trim()) {
+      newFieldErrors.name = ["Name is required."];
+    }
+    if (!email.trim()) {
+      newFieldErrors.email = ["Email is required."];
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newFieldErrors.email = ["Please enter a valid work email address."];
+    }
+
+    if (role === "operator") {
+      if (locations.length === 0) {
+        newFieldErrors.location = ["No location/dryer hub available. Please add a dryer hub first to continue."];
+      } else if (!location) {
+        newFieldErrors.location = ["Pick a location to assign the operator to."];
+      }
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      return;
+    }
+
     try {
       const res = await createUser.mutateAsync({
         name,
         email,
         role: role.toUpperCase() as unknown as Role, // backend expects ADMIN/OPERATOR
-        location,
+        location: role === "operator" ? location : "HQ",
       });
       setResult(res);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create user.");
+      if (err instanceof ApiError) {
+        if (err.details && typeof err.details === "object") {
+          setFieldErrors(err.details as Record<string, string[]>);
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Failed to create user.");
+      }
     }
   };
 
@@ -79,8 +114,9 @@ export default function AddUserForm() {
             </div>
           )}
 
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-mint px-3 py-1.5 text-xs font-medium text-brand">
-            <MailIcon className="h-4 w-4" /> Temp password: {result.tempPassword}
+          <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-brand/20 bg-mint/30 px-4 py-3 text-sm text-brand-dark text-left">
+            <MailIcon className="h-5 w-5 shrink-0 text-brand mt-0.5" />
+            <span>A welcome email containing a secure temporary password has been sent to their inbox, instructing them to change it upon first login.</span>
           </div>
 
           <div className="mt-6 flex flex-col gap-2 sm:flex-row">
@@ -150,6 +186,7 @@ export default function AddUserForm() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Zainab Bello"
             required
+            error={fieldErrors.name?.[0]}
           />
           <Input
             id="email"
@@ -159,36 +196,47 @@ export default function AddUserForm() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="user@cafsdrychain.io"
             required
+            error={fieldErrors.email?.[0]}
           />
-          <Select
-            id="location"
-            label="Location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            disabled={isLocsLoading}
-          >
-            {isLocsLoading ? (
-              <option value="">Loading locations...</option>
-            ) : locations.length === 0 ? (
-              <option value="">No locations available</option>
-            ) : (
-              locations.map((loc) => (
-                <option key={loc.id} value={loc.name}>
-                  {loc.name}
-                </option>
-              ))
-            )}
-          </Select>
+          {role === "operator" && (
+            <Select
+              id="location"
+              label="Location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              disabled={isLocsLoading}
+              error={fieldErrors.location?.[0]}
+            >
+              {isLocsLoading ? (
+                <option value="">Loading locations...</option>
+              ) : locations.length === 0 ? (
+                <option value="">No locations available</option>
+              ) : (
+                locations.map((loc) => (
+                  <option key={loc.id} value={loc.name}>
+                    {loc.name}
+                  </option>
+                ))
+              )}
+            </Select>
+          )}
 
           <div className="flex items-center gap-2 rounded-2xl border border-black/[0.08] bg-mint/40 px-4 py-3 text-sm text-brand-dark">
             <LinkIcon className="h-5 w-5 shrink-0 text-brand" />
             A deterministic wallet is derived automatically and, for operators,
-            authorised on-chain.
+            authorized on-chain.
           </div>
 
           <div className="flex flex-col gap-2 pt-1 sm:flex-row-reverse">
             <Button type="submit" full size="lg" disabled={createUser.isPending}>
-              {createUser.isPending ? "Creating…" : "Create account"}
+              {createUser.isPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Spinner className="h-5 w-5 animate-spin text-white" />
+                  Creating account…
+                </span>
+              ) : (
+                "Create account"
+              )}
             </Button>
             <LinkButton href="/admin/operators" full size="lg" variant="outline">
               Cancel

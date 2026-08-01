@@ -10,6 +10,8 @@ import PageHeader from "@/components/dashboard/PageHeader";
 import { useCreateBatch, type ApiBatch } from "@/lib/hooks/useBatches";
 import { useAuthStore } from "@/lib/store/auth";
 import { ApiError } from "@/lib/api";
+import { Spinner } from "@/components/dashboard/States";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { CheckIcon, QrIcon, LinkIcon, DownloadIcon } from "@/components/icons";
 
 type Form = {
@@ -29,6 +31,7 @@ export default function RegisterWizard() {
   const [step, setStep] = useState(0);
   const [created, setCreated] = useState<ApiBatch | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const today = new Date().toISOString().slice(0, 10);
 
   const user = useAuthStore((s) => s.user);
@@ -67,6 +70,31 @@ export default function RegisterWizard() {
 
   const onRegister = async () => {
     setError(null);
+    setFieldErrors({});
+
+    const newFieldErrors: Record<string, string[]> = {};
+    if (!form.product) {
+      newFieldErrors.product = ["Product type is required."];
+    }
+    if (!form.source.trim()) {
+      newFieldErrors.source = ["Source name is required."];
+    }
+    if (!form.supplier.trim()) {
+      newFieldErrors.supplier = ["Supplier details are required."];
+    }
+    const weightNum = Number(form.freshWeight);
+    if (isNaN(weightNum) || weightNum <= 0) {
+      newFieldErrors.freshWeight = ["Fresh weight must be a positive number."];
+    }
+    if (!form.deliveryDate) {
+      newFieldErrors.deliveryDate = ["Delivery date is required."];
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      return;
+    }
+
     try {
       const { batch } = await create.mutateAsync({
         product: form.product,
@@ -79,7 +107,15 @@ export default function RegisterWizard() {
       });
       setCreated(batch);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to register batch.");
+      if (err instanceof ApiError) {
+        if (err.details && typeof err.details === "object") {
+          setFieldErrors(err.details as Record<string, string[]>);
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Failed to register batch.");
+      }
     }
   };
 
@@ -290,7 +326,10 @@ export default function RegisterWizard() {
                 id="product"
                 type="button"
                 onClick={() => setIsProductOpen(!isProductOpen)}
-                className="flex h-12 w-full items-center justify-between rounded-2xl border border-black/[0.12] bg-white px-4 text-left text-[15px] text-brand-dark outline-none transition-colors placeholder:text-muted/60 focus:border-brand"
+                className={cn(
+                  "flex h-12 w-full items-center justify-between rounded-2xl border bg-white px-4 text-left text-[15px] text-brand-dark outline-none transition-colors placeholder:text-muted/60 focus:border-brand",
+                  fieldErrors.product?.[0] ? "border-red-500" : "border-black/[0.12]"
+                )}
               >
                 <span>{form.product || "Select product type"}</span>
                 <svg
@@ -308,6 +347,10 @@ export default function RegisterWizard() {
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </button>
+
+              {fieldErrors.product?.[0] && (
+                <p className="mt-1.5 text-xs text-red-600 font-medium leading-relaxed">{fieldErrors.product[0]}</p>
+              )}
 
               {isProductOpen && (
                 <>
@@ -388,6 +431,7 @@ export default function RegisterWizard() {
               label="Source"
               value={form.sourceType}
               onChange={(e) => set("sourceType", e.target.value)}
+              error={fieldErrors.sourceType?.[0]}
             >
               <option>Farm</option>
               <option>Market</option>
@@ -399,6 +443,7 @@ export default function RegisterWizard() {
               onChange={(e) => set("source", e.target.value)}
               placeholder={form.sourceType === "Farm" ? "Ola Farms" : "Bodija Market"}
               required
+              error={fieldErrors.source?.[0]}
             />
             <Input
               id="supplier"
@@ -407,6 +452,7 @@ export default function RegisterWizard() {
               onChange={(e) => set("supplier", e.target.value)}
               placeholder="Ibrahim Ola"
               required
+              error={fieldErrors.supplier?.[0]}
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
@@ -417,14 +463,16 @@ export default function RegisterWizard() {
                 onChange={(e) => set("freshWeight", e.target.value)}
                 placeholder="480"
                 required
+                error={fieldErrors.freshWeight?.[0]}
               />
-              <Input
+              <DatePicker
                 id="deliveryDate"
-                type="date"
+                name="deliveryDate"
                 label="Delivery date"
                 value={form.deliveryDate}
-                onChange={(e) => set("deliveryDate", e.target.value)}
+                onChange={(val) => set("deliveryDate", val)}
                 required
+                error={fieldErrors.deliveryDate?.[0]}
               />
             </div>
           </div>
@@ -479,7 +527,14 @@ export default function RegisterWizard() {
               disabled={create.isPending}
               onClick={onRegister}
             >
-              {create.isPending ? "Registering…" : "Register batch"}
+              {create.isPending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Spinner className="h-5 w-5 animate-spin text-white" />
+                  Registering batch…
+                </span>
+              ) : (
+                "Register batch"
+              )}
             </Button>
           )}
           {step > 0 ? (

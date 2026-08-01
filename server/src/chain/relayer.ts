@@ -1,3 +1,4 @@
+import type { TypedDataField } from 'ethers';
 import { env } from '../env.js';
 import { logger } from '../lib/logger.js';
 import { FORWARD_REQUEST_TYPES } from './abi.js';
@@ -53,7 +54,11 @@ async function relay(index: number, data: string): Promise<RelayResult> {
     };
 
     const message = { from, to, value: 0n, gas, nonce, deadline, data };
-    const signature = await signer.signTypedData(domain, FORWARD_REQUEST_TYPES as never, message);
+    const signature = await signer.signTypedData(
+      domain,
+      FORWARD_REQUEST_TYPES as unknown as Record<string, TypedDataField[]>,
+      message
+    );
 
     // execute() struct omits nonce (read internally); signature covers it.
     const requestData = { from, to, value: 0n, gas, deadline, data, signature };

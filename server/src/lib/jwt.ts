@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import type { Role } from '@prisma/client';
 import { env } from '../env.js';
+import { AppError } from '../middleware/error.js';
 
 export type AccessPayload = {
   sub: string; // user id
@@ -33,6 +34,9 @@ export function generateRefreshToken(): { token: string; hash: string } {
 }
 
 export function hashRefreshToken(token: string): string {
+  if (!token || typeof token !== 'string') {
+    throw new AppError(401, 'Invalid session token');
+  }
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 

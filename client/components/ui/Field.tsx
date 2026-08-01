@@ -34,7 +34,7 @@ function extractOptions(node: React.ReactNode, list: { value: string; label: str
 }
 
 const control =
-  "w-full rounded-2xl border border-black/[0.12] bg-white px-4 text-[15px] text-brand-dark outline-none transition-colors placeholder:text-muted/60 focus:border-brand disabled:bg-black/[0.03]";
+  "w-full rounded-2xl border bg-white px-4 text-[15px] text-brand-dark outline-none transition-colors placeholder:text-muted/60 focus:border-brand disabled:bg-black/[0.03]";
 
 export function Label({
   children,
@@ -60,8 +60,9 @@ export function Input({
   id,
   className,
   type,
+  error,
   ...props
-}: { label?: string } & InputHTMLAttributes<HTMLInputElement>) {
+}: { label?: string; error?: string } & InputHTMLAttributes<HTMLInputElement>) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
   const inputType = isPassword ? (showPassword ? "text" : "password") : type;
@@ -77,6 +78,7 @@ export function Input({
             control,
             "h-12",
             isPassword && "pr-12",
+            error ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500" : "border-black/[0.12]",
             className
           )}
           {...props}
@@ -96,6 +98,9 @@ export function Input({
           </button>
         )}
       </div>
+      {error && (
+        <p className="mt-1.5 text-xs text-red-600 font-medium leading-relaxed">{error}</p>
+      )}
     </div>
   );
 }
@@ -104,16 +109,25 @@ export function Textarea({
   label,
   id,
   className,
+  error,
   ...props
-}: { label?: string } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: { label?: string; error?: string } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <div>
       {label && <Label htmlFor={id}>{label}</Label>}
       <textarea
         id={id}
-        className={cn(control, "resize-none py-3", className)}
+        className={cn(
+          control,
+          "resize-none py-3",
+          error ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500" : "border-black/[0.12]",
+          className
+        )}
         {...props}
       />
+      {error && (
+        <p className="mt-1.5 text-xs text-red-600 font-medium leading-relaxed">{error}</p>
+      )}
     </div>
   );
 }
@@ -130,9 +144,11 @@ export function Select({
   placeholder = "Select an option...",
   required,
   name,
+  error,
 }: {
   label?: string;
   placeholder?: string;
+  error?: string;
 } & SelectHTMLAttributes<HTMLSelectElement>) {
   // Extract options from children
   const optionsList: { value: string; label: string }[] = [];
@@ -213,6 +229,7 @@ export function Select({
             control,
             "h-12 flex items-center justify-between text-left w-full",
             isOpen && "border-brand ring-1 ring-brand/20",
+            error ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500" : "border-black/[0.12]",
             disabled && "bg-black/[0.03] cursor-not-allowed text-muted/60",
             className
           )}
@@ -302,6 +319,9 @@ export function Select({
           </div>
         )}
       </div>
+      {error && (
+        <p className="mt-1.5 text-xs text-red-600 font-medium leading-relaxed">{error}</p>
+      )}
     </div>
   );
 }

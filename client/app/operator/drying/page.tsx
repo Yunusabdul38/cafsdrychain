@@ -12,9 +12,10 @@ import { toUiBatches } from "@/lib/adapters";
 import { formatDate } from "@/lib/utils";
 import { nextAction } from "@/lib/lifecycle";
 import { ChevronRightIcon, SunIcon } from "@/components/icons";
+import { LiveIndicator } from "@/components/ui/LiveIndicator";
 
 export default function DryingPage() {
-  const { data, isLoading, isError, refetch } = useBatches();
+  const { data, isLoading, isError, refetch, dataUpdatedAt } = useBatches();
   const batches = useMemo(() => (data ? toUiBatches(data) : []), [data]);
 
   const toStart = batches.filter((b) => b.stage === "registered");
@@ -22,7 +23,10 @@ export default function DryingPage() {
 
   return (
     <>
-      <PageHeader title="Drying" description="Start and complete drying for batches at your hub." />
+      <div className="flex items-start justify-between gap-3">
+        <PageHeader title="Drying" description="Start and complete drying for batches at your hub." />
+        <LiveIndicator dataUpdatedAt={dataUpdatedAt} className="mt-1 shrink-0" />
+      </div>
 
       {isLoading ? (
         <LoadingState />

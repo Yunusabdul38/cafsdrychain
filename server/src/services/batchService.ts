@@ -124,9 +124,26 @@ export async function advanceBatch(
   });
   if (!batch) throw new AppError(404, 'Batch not found');
 
-  // Operators may only advance their own batches; admins may advance any.
-  if (actor.role === 'OPERATOR' && batch.operatorId !== actor.id) {
-    throw new AppError(403, 'You are not assigned to this batch');
+  // Operators may only advance batches at their own hub; admins may advance any.
+  if (actor.role === 'OPERATOR') {
+    const actorUser = await prisma.user.findUnique({
+      where: { id: actor.id },
+      select: { location: true },
+    });
+    const sameHub = actorUser?.location && actorUser.location === batch.location;
+    if (!sameHub) {
+      throw new AppError(403, 'You are not assigned to the hub where this batch is located');
+    }
+  }
+
+  // Optimistic-lock guard: if the caller declares the stage they expect the
+  // batch to be in and it no longer matches, another operator already advanced
+  // it — return 409 so the client can refresh and show the up-to-date state.
+  if (input.expectedStage && input.expectedStage !== batch.stage) {
+    throw new AppError(
+      409,
+      `This step has already been recorded. The batch is now at stage "${batch.stage}". Please refresh to see the latest status.`
+    );
   }
 
   const target = nextStage(batch.stage);
@@ -220,9 +237,13 @@ async function persistChain(id: string, res: RelayResult, latestEvent = false) {
   }
 }
 
-export function listBatches(filter?: { operatorId?: string }) {
+export function listBatches(filter?: { operatorId?: string; location?: string }) {
   return prisma.batch.findMany({
-    where: filter?.operatorId ? { operatorId: filter.operatorId } : undefined,
+    where: filter?.operatorId
+      ? { operatorId: filter.operatorId }
+      : filter?.location
+        ? { location: filter.location }
+        : undefined,
     orderBy: { createdAt: 'desc' },
     include,
   });

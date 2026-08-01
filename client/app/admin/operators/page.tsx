@@ -10,6 +10,7 @@ import { useUsers, useUpdateUserStatus, useDeleteUser, type ApiUser } from "@/li
 import { formatDate } from "@/lib/utils";
 import { PlusIcon, UsersIcon, TrashIcon, CloseIcon, MoreVerticalIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/lib/store/auth";
 
 const roleLabel: Record<string, string> = {
   operator: "Operator",
@@ -20,6 +21,7 @@ const initials = (name: string) =>
   name.split(" ").map((n) => n[0]).slice(0, 2).join("");
 
 export default function AdminOperators() {
+  const currentUser = useAuthStore((s) => s.user);
   const { data: users, isLoading, isError, refetch } = useUsers();
   const updateStatus = useUpdateUserStatus();
   const deleteUserMutation = useDeleteUser();
@@ -28,6 +30,11 @@ export default function AdminOperators() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteResultMsg, setDeleteResultMsg] = useState<string | null>(null);
   const [activeMenuUserId, setActiveMenuUserId] = useState<string | null>(null);
+  const [roleTab, setRoleTab] = useState<"operator" | "admin">("operator");
+
+  const operators = users?.filter((u) => u.role.toLowerCase() === "operator") ?? [];
+  const admins = users?.filter((u) => u.role.toLowerCase() === "admin") ?? [];
+  const displayedUsers = roleTab === "operator" ? operators : admins;
 
   useEffect(() => {
     function handleDocumentClick() {
@@ -92,129 +99,202 @@ export default function AdminOperators() {
         />
       ) : (
         <>
-          {/* Mobile cards */}
-          <ul className="space-y-3 md:hidden">
-            {users.map((u) => (
-              <li key={u.id}>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mint text-xs font-semibold text-brand">
-                      {initials(u.name)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-brand-dark">{u.name}</p>
-                      <p className="truncate text-xs text-muted">{u.email}</p>
-                    </div>
-                    <StatusPill status={u.status} />
-                  </div>
-                  <div className="mt-3 flex items-center justify-between border-t border-black/[0.04] pt-3">
-                    <div className="flex items-center gap-2 text-xs text-muted">
-                      <Badge className="bg-sky-soft text-sky">{roleLabel[u.role] ?? u.role}</Badge>
-                      <span>{u.location ?? "—"}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleToggleStatus(u.id, u.status)}
-                        className="text-xs font-semibold text-brand hover:underline"
-                        disabled={updateStatus.isPending}
-                      >
-                        {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                      </button>
-                      <button
-                        onClick={() => setConfirmingDeleteUser(u)}
-                        className="text-muted hover:text-red-600 p-1"
-                        title="Delete User"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </Card>
-              </li>
-            ))}
-          </ul>
+          {/* Tabs */}
+          <div className="mb-6 flex border-b border-black/[0.06] gap-2">
+            <button
+              onClick={() => setRoleTab("operator")}
+              className={cn(
+                "relative pb-3 text-sm font-semibold transition-colors px-4",
+                roleTab === "operator"
+                  ? "text-brand"
+                  : "text-muted hover:text-brand-dark"
+              )}
+            >
+              Operators
+              <span className={cn(
+                "ml-2 rounded-full px-2 py-0.5 text-xs font-semibold",
+                roleTab === "operator"
+                  ? "bg-mint text-brand"
+                  : "bg-black/[0.04] text-muted"
+              )}>
+                {operators.length}
+              </span>
+              {roleTab === "operator" && (
+                <span className="absolute bottom-0 inset-x-0 h-0.5 bg-brand animate-in fade-in duration-200" />
+              )}
+            </button>
+            <button
+              onClick={() => setRoleTab("admin")}
+              className={cn(
+                "relative pb-3 text-sm font-semibold transition-colors px-4",
+                roleTab === "admin"
+                  ? "text-brand"
+                  : "text-muted hover:text-brand-dark"
+              )}
+            >
+              Administrators
+              <span className={cn(
+                "ml-2 rounded-full px-2 py-0.5 text-xs font-semibold",
+                roleTab === "admin"
+                  ? "bg-mint text-brand"
+                  : "bg-black/[0.04] text-muted"
+              )}>
+                {admins.length}
+              </span>
+              {roleTab === "admin" && (
+                <span className="absolute bottom-0 inset-x-0 h-0.5 bg-brand animate-in fade-in duration-200" />
+              )}
+            </button>
+          </div>
 
-          {/* Desktop table */}
-          <div className="hidden overflow-hidden rounded-2xl border border-black/[0.08] bg-white md:block">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-black/[0.06] text-xs uppercase tracking-wide text-muted">
-                  <th className="px-5 py-3 font-medium">User</th>
-                  <th className="px-5 py-3 font-medium">Role</th>
-                  <th className="px-5 py-3 font-medium">Location</th>
-                  <th className="px-5 py-3 font-medium">Wallet</th>
-                  <th className="px-5 py-3 font-medium">Joined</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id} className="border-b border-black/[0.05] last:border-0 hover:bg-mint/40">
-                    <td className="px-5 py-3.5">
+          {displayedUsers.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-black/[0.08] bg-white p-12 text-center">
+              <p className="text-sm text-muted">
+                No {roleTab === "operator" ? "operators" : "administrators"} registered yet.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile cards */}
+              <ul className="space-y-3 md:hidden">
+                {displayedUsers.map((u) => (
+                  <li key={u.id}>
+                    <Card className="p-4">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-mint text-[11px] font-semibold text-brand">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mint text-xs font-semibold text-brand">
                           {initials(u.name)}
                         </span>
-                        <div>
-                          <p className="font-medium text-brand-dark">{u.name}</p>
-                          <p className="text-xs text-muted">{u.email}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold text-brand-dark">
+                            {u.name} {u.id === currentUser?.id && <span className="text-xs font-normal text-muted">(You)</span>}
+                          </p>
+                          <p className="truncate text-xs text-muted">{u.email}</p>
+                        </div>
+                        <StatusPill status={u.status} />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between border-t border-black/[0.04] pt-3">
+                        <div className="flex items-center gap-2 text-xs text-muted">
+                          <Badge className="bg-sky-soft text-sky">{roleLabel[u.role.toLowerCase()] ?? u.role}</Badge>
+                          <span>{u.location ?? "—"}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {u.id === currentUser?.id ? (
+                            <span className="text-xs text-muted font-medium">Current session</span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleToggleStatus(u.id, u.status)}
+                                className="text-xs font-semibold text-brand hover:underline"
+                                disabled={updateStatus.isPending}
+                              >
+                                {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                              </button>
+                              <button
+                                onClick={() => setConfirmingDeleteUser(u)}
+                                className="text-muted hover:text-red-600 p-1"
+                                title="Delete User"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <Badge className="bg-sky-soft text-sky">{roleLabel[u.role] ?? u.role}</Badge>
-                    </td>
-                    <td className="px-5 py-3.5 text-muted">{u.location ?? "—"}</td>
-                    <td className="px-5 py-3.5 font-mono text-xs text-muted">
-                      {u.wallet ? `${u.wallet.address.slice(0, 6)}…${u.wallet.address.slice(-4)}` : "—"}
-                    </td>
-                    <td className="px-5 py-3.5 text-muted">{formatDate(u.createdAt)}</td>
-                    <td className="px-5 py-3.5">
-                      <StatusPill status={u.status} />
-                    </td>
-                    <td className="px-5 py-3.5 text-right relative">
-                      <div className="flex justify-end">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuUserId(activeMenuUserId === u.id ? null : u.id);
-                          }}
-                          className="p-1.5 rounded-full hover:bg-black/[0.04] text-muted hover:text-brand-dark transition-colors"
-                          title="Actions"
-                        >
-                          <MoreVerticalIcon className="h-5 w-5" />
-                        </button>
-
-                        {activeMenuUserId === u.id && (
-                          <div className="absolute right-5 top-11 z-20 w-36 rounded-xl border border-black/[0.08] bg-white shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150 text-left">
-                            <button
-                              onClick={() => {
-                                handleToggleStatus(u.id, u.status);
-                                setActiveMenuUserId(null);
-                              }}
-                              className="w-full text-left px-4 py-2.5 text-xs font-semibold text-brand-dark hover:bg-black/[0.03] transition-colors"
-                              disabled={updateStatus.isPending}
-                            >
-                              {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setConfirmingDeleteUser(u);
-                                setActiveMenuUserId(null);
-                              }}
-                              className="w-full text-left px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors border-t border-black/[0.04]"
-                            >
-                              Delete account
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>                  </tr>
+                    </Card>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </ul>
+
+              {/* Desktop table */}
+              <div className="hidden overflow-visible rounded-2xl border border-black/[0.08] bg-white md:block">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-black/[0.06] text-xs uppercase tracking-wide text-muted">
+                      <th className="px-5 py-3 font-medium">User</th>
+                      <th className="px-5 py-3 font-medium">Role</th>
+                      <th className="px-5 py-3 font-medium">Location</th>
+                      <th className="px-5 py-3 font-medium">Wallet</th>
+                      <th className="px-5 py-3 font-medium">Joined</th>
+                      <th className="px-5 py-3 font-medium">Status</th>
+                      <th className="px-5 py-3 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedUsers.map((u) => (
+                      <tr key={u.id} className="border-b border-black/[0.05] last:border-0 hover:bg-mint/40">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-mint text-[11px] font-semibold text-brand">
+                              {initials(u.name)}
+                            </span>
+                            <div>
+                              <p className="font-medium text-brand-dark">
+                                {u.name} {u.id === currentUser?.id && <span className="ml-1 text-xs font-normal text-muted">(You)</span>}
+                              </p>
+                              <p className="text-xs text-muted">{u.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <Badge className="bg-sky-soft text-sky">{roleLabel[u.role.toLowerCase()] ?? u.role}</Badge>
+                        </td>
+                        <td className="px-5 py-3.5 text-muted">{u.location ?? "—"}</td>
+                        <td className="px-5 py-3.5 font-mono text-xs text-muted">
+                          {u.wallet ? `${u.wallet.address.slice(0, 6)}…${u.wallet.address.slice(-4)}` : "—"}
+                        </td>
+                        <td className="px-5 py-3.5 text-muted">{formatDate(u.createdAt)}</td>
+                        <td className="px-5 py-3.5">
+                          <StatusPill status={u.status} />
+                        </td>
+                        <td className="px-5 py-3.5 text-right relative">
+                          {u.id === currentUser?.id ? (
+                            <span className="text-xs text-muted font-medium pr-2">Current session</span>
+                          ) : (
+                            <div className="flex justify-end">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuUserId(activeMenuUserId === u.id ? null : u.id);
+                                }}
+                                className="p-1.5 rounded-full hover:bg-black/[0.04] text-muted hover:text-brand-dark transition-colors"
+                                title="Actions"
+                              >
+                                <MoreVerticalIcon className="h-5 w-5" />
+                              </button>
+
+                              {activeMenuUserId === u.id && (
+                                <div className="absolute right-5 top-11 z-20 w-36 rounded-xl border border-black/[0.08] bg-white shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150 text-left">
+                                  <button
+                                    onClick={() => {
+                                      handleToggleStatus(u.id, u.status);
+                                      setActiveMenuUserId(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-xs font-semibold text-brand-dark hover:bg-black/[0.03] transition-colors"
+                                    disabled={updateStatus.isPending}
+                                  >
+                                    {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setConfirmingDeleteUser(u);
+                                      setActiveMenuUserId(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors border-t border-black/[0.04]"
+                                  >
+                                    Delete account
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
 

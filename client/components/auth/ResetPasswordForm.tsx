@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import { useResetPassword, useVerifyResetToken } from "@/lib/hooks/useAuth";
 import { ApiError } from "@/lib/api";
 import { CheckIcon, ClockIcon } from "@/components/icons";
+import { Spinner } from "@/components/dashboard/States";
 
 export default function ResetPasswordForm() {
   const router = useRouter();
@@ -17,19 +18,41 @@ export default function ResetPasswordForm() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [done, setDone] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (password.length < 8) return setError("Password must be at least 8 characters.");
-    if (password !== confirm) return setError("Passwords do not match.");
+    setFieldErrors({});
+
+    const newFieldErrors: Record<string, string[]> = {};
+    if (password.length < 8) {
+      newFieldErrors.password = ["Password must be at least 8 characters."];
+    }
+    if (password !== confirm) {
+      newFieldErrors.confirm = ["Passwords do not match."];
+    }
+
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+      return;
+    }
+
     try {
       await reset.mutateAsync({ token, newPassword: password });
       setDone(true);
       setTimeout(() => router.push("/login"), 1800);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      if (err instanceof ApiError) {
+        if (err.details && typeof err.details === "object") {
+          setFieldErrors(err.details as Record<string, string[]>);
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Something went wrong.");
+      }
     }
   };
 
@@ -128,6 +151,7 @@ export default function ResetPasswordForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
+          error={fieldErrors.password?.[0]}
         />
         <Input
           id="confirm"
@@ -137,9 +161,17 @@ export default function ResetPasswordForm() {
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           placeholder="••••••••"
+          error={fieldErrors.confirm?.[0]}
         />
         <Button type="submit" full size="lg" disabled={reset.isPending}>
-          {reset.isPending ? "Updating…" : "Update password"}
+          {reset.isPending ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner className="h-5 w-5 animate-spin text-white" />
+              Updating password…
+            </span>
+          ) : (
+            "Update password"
+          )}
         </Button>
       </form>
     </div>

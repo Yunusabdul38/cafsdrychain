@@ -41,7 +41,9 @@ router.post(
   '/refresh',
   authLimiter,
   asyncHandler(async (req, res) => {
-    const token = req.cookies?.[REFRESH_COOKIE] ?? req.body?.refreshToken;
+    const cookieToken = req.cookies?.[REFRESH_COOKIE];
+    const bodyToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : undefined;
+    const token = (typeof cookieToken === 'string' ? cookieToken : undefined) ?? bodyToken;
     if (!token) throw new AppError(401, 'No session');
     const { accessToken, refreshToken } = await authService.refresh(token);
     res.cookie(REFRESH_COOKIE, refreshToken, cookieOptions);
@@ -52,7 +54,9 @@ router.post(
 router.post(
   '/logout',
   asyncHandler(async (req, res) => {
-    const token = req.cookies?.[REFRESH_COOKIE] ?? req.body?.refreshToken;
+    const cookieToken = req.cookies?.[REFRESH_COOKIE];
+    const bodyToken = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : undefined;
+    const token = (typeof cookieToken === 'string' ? cookieToken : undefined) ?? bodyToken;
     if (token) await authService.logout(token);
     res.clearCookie(REFRESH_COOKIE, { ...cookieOptions, maxAge: undefined });
     res.json({ ok: true });
