@@ -22,11 +22,24 @@ app.set('trust proxy', 1);
 
 // --- Security middleware -------------------------------------------------
 app.use(helmet());
+const allowedOrigins = new Set(corsOrigins);
+corsOrigins.forEach((url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.startsWith('www.')) {
+      allowedOrigins.add(`${parsed.protocol}//${parsed.hostname.slice(4)}`);
+    } else {
+      allowedOrigins.add(`${parsed.protocol}//www.${parsed.hostname}`);
+    }
+  } catch {}
+});
+
 app.use(
   cors({
     origin(origin, cb) {
-      // Allow same-origin / server-to-server (no origin) and the allowlist.
-      if (!origin || corsOrigins.includes(origin)) return cb(null, true);
+      if (!origin || allowedOrigins.has(origin) || origin.endsWith('.vercel.app')) {
+        return cb(null, true);
+      }
       cb(null, false);
     },
     credentials: true,
