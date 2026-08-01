@@ -1,21 +1,25 @@
-import argon2 from 'argon2';
 import crypto from 'node:crypto';
+import { promisify } from 'node:util';
 
-// Argon2id — memory-hard, resistant to GPU cracking.
-const options: argon2.Options = {
-  type: argon2.argon2id,
-  memoryCost: 19456, // 19 MiB
-  timeCost: 2,
-  parallelism: 1,
-};
+const scrypt = promisify(crypto.scrypt);
+const randomBytes = promisify(crypto.randomBytes);
 
-export function hashPassword(plain: string): Promise<string> {
-  return argon2.hash(plain, options);
+export async function hashPassword(plain: string): Promise<string> {
+  const salt = (await randomBytes(16)).toString('hex');
+  const derivedKey = (await scrypt(plain, salt, 64)) as Buffer;
+  return `scrypt:${salt}:${derivedKey.toString('hex')}`;
 }
 
 export async function verifyPassword(hash: string, plain: string): Promise<boolean> {
   try {
-    return await argon2.verify(hash, plain);
+    if (hash.startsWith('$argon2')) {
+      const argon2 = await import('argon2');
+      return await argon2.default.verify(hash, plain);
+    }
+    const [algo, salt, key] = hash.split(':');
+    if (algo !== 'scrypt' || !salt || !key) return false;
+    const derivedKey = (await scrypt(plain, salt, 64)) as Buffer;
+    return crypto.timingSafeEqual(Buffer.from(key, 'hex'), derivedKey);
   } catch {
     return false;
   }
@@ -23,6 +27,5 @@ export async function verifyPassword(hash: string, plain: string): Promise<boole
 
 /** Generate a random temporary password for admin-provisioned accounts. */
 export function generateTempPassword(): string {
-  // 12 URL-safe chars, no ambiguity issues for onboarding emails.
   return crypto.randomBytes(9).toString('base64url');
 }
