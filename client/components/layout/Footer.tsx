@@ -14,7 +14,7 @@ const columns = [
     links: [
       { label: "Contact", href: "#contact" },
       { label: "Login", href: "#login" },
-      { label: "Home", href: "#home" },
+      // { label: "Home", href: "#home" },
     ],
   },
 ];
@@ -44,7 +44,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
-              End-to-end traceability for solar-dried produce — every batch
+              End-to-end traceability for solar-dried produce every batch
               verified and secured on the Base blockchain.
             </p>
           </div>
