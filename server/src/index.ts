@@ -54,8 +54,9 @@ app.use(errorHandler);
 
 async function start() {
   await ensureWalletCounter();
-  app.listen(env.PORT, () => {
-    logger.info(`Server running on port ${env.PORT} (${env.NODE_ENV})`);
+  const port = Number(process.env.PORT) || env.PORT;
+  app.listen(port, '0.0.0.0', () => {
+    logger.info(`Server running on port ${port} (${env.NODE_ENV})`);
     logger.info(`On-chain integration: ${chainEnabled() ? 'ENABLED' : 'disabled'}`);
   });
 }
