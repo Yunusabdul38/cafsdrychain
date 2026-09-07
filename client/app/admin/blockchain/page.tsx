@@ -19,21 +19,21 @@ export default function AdminBlockchain() {
 
   const stats = [
     { label: "Total records", value: String(records.length), hint: "events" },
-    { label: "Confirmed", value: String(confirmed), hint: "on-chain" },
+    { label: "Confirmed", value: String(confirmed), hint: "on chain" },
     { label: "Pending", value: String(pending), hint: "awaiting" },
     { label: "Failed", value: String(failed), hint: failed ? "needs retry" : "none" },
   ];
 
   return (
     <>
-      <PageHeader title="Blockchain ledger" description="Every batch event, recorded on Base." />
+      <PageHeader title="Blockchain ledger" description="Every batch event, recorded on the blockchain." />
 
       {isLoading ? (
         <LoadingState />
       ) : isError ? (
         <ErrorState message="Couldn't load the ledger." onRetry={() => refetch()} />
       ) : records.length === 0 ? (
-        <EmptyState icon={<LinkIcon className="h-6 w-6" />} title="No on-chain records yet" description="Events appear here as operators record batch updates." />
+        <EmptyState icon={<LinkIcon className="h-6 w-6" />} title="No on chain records yet" description="Events appear here as operators record batch updates." />
       ) : (
         <>
           <StatGrid stats={stats} />

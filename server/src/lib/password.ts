@@ -24,8 +24,3 @@ export async function verifyPassword(hash: string, plain: string): Promise<boole
     return false;
   }
 }
-
-/** Generate a random temporary password for admin-provisioned accounts. */
-export function generateTempPassword(): string {
-  return crypto.randomBytes(9).toString('base64url');
-}

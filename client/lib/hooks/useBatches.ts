@@ -5,32 +5,42 @@ import { api } from "@/lib/api";
 
 export type ApiStage =
   | "REGISTERED"
+  | "AWAITING_PAYMENT"
   | "DRYING"
   | "DRIED"
   | "STORED"
   | "IN_TRANSIT"
   | "DELIVERED";
 
+export type ApiPayment = {
+  amount: number; // kobo
+  currency: string;
+  status: "PENDING" | "PAID" | "FAILED";
+  reference: string;
+  checkoutUrl: string;
+  paidAt?: string | null;
+};
+
 export type ApiBatch = {
   id: string;
   batchId: string;
+  category: string;
   product: string;
   sourceType: "Farm" | "Market";
   source: string;
-  supplier: string;
   freshWeight: number;
   finalWeight?: number | null;
   moisture?: number | null;
-  deliveryDate: string;
+  entryDate: string;
   dryingStart?: string | null;
   dryingEnd?: string | null;
+  dryingMethod?: string | null;
   quality?: string | null;
   storageLocation?: string | null;
-  packaging?: string | null;
-  transport?: string | null;
   destination?: string | null;
   stage: ApiStage;
   location: string;
+  payment?: ApiPayment | null;
   chainStatus: "PENDING" | "CONFIRMED" | "FAILED";
   txHash?: string | null;
   metadataHash?: string;
@@ -40,6 +50,7 @@ export type ApiBatch = {
     stage: ApiStage;
     title: string;
     actor: string;
+    note?: string | null;
     createdAt: string;
     txHash?: string | null;
     chainStatus?: string;
@@ -69,12 +80,11 @@ export function useCreateBatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: {
+      category: string;
       product: string;
       sourceType: "Farm" | "Market";
       source: string;
-      supplier: string;
       freshWeight: number;
-      deliveryDate: string;
       location: string;
     }) => api.post<{ batch: ApiBatch }>("/api/batches", input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["batches"] }),
@@ -85,12 +95,11 @@ export type AdvanceBatchInput = {
   expectedStage?: string;
   dryingStart?: string;
   dryingEnd?: string;
+  dryingMethod?: string;
   finalWeight?: number;
   moisture?: number;
   quality?: string;
   storageLocation?: string;
-  packaging?: string;
-  transport?: string;
   destination?: string;
   notes?: string;
 };

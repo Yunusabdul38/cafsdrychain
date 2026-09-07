@@ -10,22 +10,28 @@ import {
   type RelayResult,
 } from '../chain/relayer.js';
 import type { AdvanceBatchInput, CreateBatchInput } from '../schemas/index.js';
+import { assertPaidForDrying, waivePaymentForBatch } from './paymentService.js';
+import { getSettings } from './settingsService.js';
+
+/** Shortest run that can be recorded between drying start and completion. */
+const MIN_DRYING_MS = 60 * 60 * 1000;
 
 const ORDER: BatchStage[] = [
   'REGISTERED',
+  'AWAITING_PAYMENT',
   'DRYING',
   'DRIED',
   'STORED',
-  'IN_TRANSIT',
   'DELIVERED',
 ];
 
 const EVENT_TITLE: Record<BatchStage, string> = {
   REGISTERED: 'Batch registered',
+  AWAITING_PAYMENT: 'Drying fee set',
   DRYING: 'Drying started',
   DRIED: 'Drying completed',
   STORED: 'Moved to storage',
-  IN_TRANSIT: 'Dispatched',
+  IN_TRANSIT: 'Dispatched', // legacy — no longer reachable, kept for historical events
   DELIVERED: 'Delivered',
 };
 
@@ -44,12 +50,14 @@ function newBatchId(): string {
 const include = {
   operator: { select: { id: true, name: true, location: true, wallet: { select: { index: true, address: true } } } },
   events: { orderBy: { createdAt: 'asc' } },
+  payment: true,
 } satisfies Prisma.BatchInclude;
 
 /** Compute the tamper-evidence hash from the batch's canonical record. */
 function hashBatch(b: Record<string, unknown>): string {
   return metadataHash({
     batchId: b.batchId,
+    category: b.category,
     product: b.product,
     source: b.source,
     sourceType: b.sourceType,
@@ -57,6 +65,7 @@ function hashBatch(b: Record<string, unknown>): string {
     freshWeight: b.freshWeight,
     finalWeight: b.finalWeight ?? null,
     moisture: b.moisture ?? null,
+    dryingMethod: b.dryingMethod ?? null,
     stage: b.stage,
     storageLocation: b.storageLocation ?? null,
     destination: b.destination ?? null,
@@ -71,17 +80,20 @@ export async function createBatch(operatorId: string, input: CreateBatchInput) {
   if (!operator) throw new AppError(404, 'Operator not found');
 
   const batchId = newBatchId();
+  // The entry date is when the operator confirms registration — recorded here
+  // rather than accepted from the client, so it can't be back- or post-dated.
+  const entryDate = new Date();
   const hash = hashBatch({ ...input, batchId, stage: 'REGISTERED' });
 
   const batch = await prisma.batch.create({
     data: {
       batchId,
+      category: input.category,
       product: input.product,
       sourceType: input.sourceType,
       source: input.source,
-      supplier: input.supplier,
       freshWeight: input.freshWeight,
-      deliveryDate: input.deliveryDate,
+      entryDate,
       location: input.location,
       stage: 'REGISTERED',
       metadataHash: hash,
@@ -110,6 +122,13 @@ export async function createBatch(operatorId: string, input: CreateBatchInput) {
     await persistChain(batch.id, res, true);
   }
 
+  // With fees switched off there is nothing for the operator to collect, so the
+  // payment step is settled here as a recorded zero fee. They never see it.
+  const settings = await getSettings();
+  if (!settings.feesEnabled) {
+    await waivePaymentForBatch(batchId);
+  }
+
   return getBatch(batchId);
 }
 
@@ -124,16 +143,20 @@ export async function advanceBatch(
   });
   if (!batch) throw new AppError(404, 'Batch not found');
 
-  // Operators may only advance batches at their own hub; admins may advance any.
-  if (actor.role === 'OPERATOR') {
-    const actorUser = await prisma.user.findUnique({
-      where: { id: actor.id },
-      select: { location: true },
-    });
-    const sameHub = actorUser?.location && actorUser.location === batch.location;
-    if (!sameHub) {
-      throw new AppError(403, 'You are not assigned to the hub where this batch is located');
-    }
+  // Recording a stage is field work: only an operator, and only at their own
+  // hub. Admins oversee and audit; they do not stand in for an operator, so
+  // there is no bypass here even though the route already blocks them.
+  if (actor.role !== 'OPERATOR') {
+    throw new AppError(403, 'Only an operator at the hub can record a batch stage');
+  }
+
+  const actorUser = await prisma.user.findUnique({
+    where: { id: actor.id },
+    select: { location: true },
+  });
+  const sameHub = actorUser?.location && actorUser.location === batch.location;
+  if (!sameHub) {
+    throw new AppError(403, 'You are not assigned to the hub where this batch is located');
   }
 
   // Optimistic-lock guard: if the caller declares the stage they expect the
@@ -149,12 +172,56 @@ export async function advanceBatch(
   const target = nextStage(batch.stage);
   if (!target) throw new AppError(400, 'Batch lifecycle is already complete');
 
+  // AWAITING_PAYMENT is entered by setting the fee (see paymentService), not by
+  // advancing — and drying stays locked until the money is confirmed.
+  if (target === 'AWAITING_PAYMENT') {
+    const settings = await getSettings();
+    if (settings.feesEnabled) {
+      throw new AppError(400, 'Set the drying fee for this batch to continue');
+    }
+    // Fees were switched off after this batch was registered: clear the step
+    // rather than stranding it.
+    await waivePaymentForBatch(batchId);
+    return getBatch(batchId);
+  }
+  if (target === 'DRYING') {
+    await assertPaidForDrying(batch.id);
+  }
+
   const now = new Date();
+
+  // Ordering rules the API schema cannot see: a batch cannot be dried before it
+  // was taken in, and drying cannot finish before it started.
+  if (input.dryingStart && input.dryingStart < batch.entryDate) {
+    throw new AppError(400, 'Drying cannot start before the batch entry date');
+  }
+  // Mirrors the registry's on-chain rule: drying removes water, so a final
+  // weight above the intake weight is a mis-entry. Enforced here too, or the
+  // record would save off-chain and then fail silently when relayed.
+  if (input.finalWeight !== undefined && input.finalWeight > batch.freshWeight) {
+    throw new AppError(
+      400,
+      `Final weight cannot exceed the fresh weight of ${batch.freshWeight} kg`
+    );
+  }
+
+  if (input.dryingEnd) {
+    const startedAt = batch.dryingStart ?? input.dryingStart;
+    // Solar drying takes hours; anything shorter is a mis-entry, not a record.
+    if (startedAt && input.dryingEnd.getTime() - startedAt.getTime() < MIN_DRYING_MS) {
+      throw new AppError(
+        400,
+        'Drying must run for at least an hour before it can be completed'
+      );
+    }
+  }
+
   const data: Prisma.BatchUpdateInput = { stage: target };
 
   switch (target) {
     case 'DRYING':
       data.dryingStart = input.dryingStart ?? now;
+      if (input.dryingMethod) data.dryingMethod = input.dryingMethod;
       break;
     case 'DRIED':
       data.dryingEnd = input.dryingEnd ?? now;
@@ -164,11 +231,6 @@ export async function advanceBatch(
       break;
     case 'STORED':
       if (input.storageLocation) data.storageLocation = input.storageLocation;
-      if (input.packaging) data.packaging = input.packaging;
-      break;
-    case 'IN_TRANSIT':
-      if (input.transport) data.transport = input.transport;
-      if (input.destination) data.destination = input.destination;
       break;
     case 'DELIVERED':
       if (input.destination) data.destination = input.destination;
@@ -188,6 +250,7 @@ export async function advanceBatch(
           stage: target,
           title: EVENT_TITLE[target],
           actor: actor.name,
+          note: input.notes?.trim() || null,
           metadataHash: hash,
         },
       },
@@ -205,8 +268,6 @@ export async function advanceBatch(
       res = await relayDrying(index, batchId, facility, 2, input.finalWeight ?? batch.freshWeight, hash);
     } else if (target === 'STORED') {
       res = await relayLogistics(index, batchId, facility, 3, hash);
-    } else if (target === 'IN_TRANSIT') {
-      res = await relayLogistics(index, batchId, facility, 4, hash);
     } else {
       res = await relayLogistics(index, batchId, facility, 5, hash);
     }
@@ -260,19 +321,22 @@ export async function getPublicBatch(batchId: string) {
   const b = await getBatch(batchId);
   return {
     batchId: b.batchId,
+    category: b.category,
     product: b.product,
     source: b.source,
     sourceType: b.sourceType,
-    supplier: b.supplier,
     freshWeight: b.freshWeight,
     finalWeight: b.finalWeight,
     moisture: b.moisture,
     quality: b.quality,
+    dryingMethod: b.dryingMethod,
+    dryingStart: b.dryingStart,
+    dryingEnd: b.dryingEnd,
     stage: b.stage,
     location: b.location,
     storageLocation: b.storageLocation,
     destination: b.destination,
-    deliveryDate: b.deliveryDate,
+    entryDate: b.entryDate,
     verified: b.chainStatus === 'CONFIRMED',
     metadataHash: b.metadataHash,
     txHash: b.txHash,
@@ -280,6 +344,7 @@ export async function getPublicBatch(batchId: string) {
       stage: e.stage,
       title: e.title,
       actor: e.actor,
+      note: e.note,
       timestamp: e.createdAt,
       txHash: e.txHash,
     })),

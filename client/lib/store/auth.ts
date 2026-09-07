@@ -7,19 +7,22 @@ export type AuthUser = {
   email: string;
   role: Role;
   location?: string | null;
-  mustChangePassword?: boolean;
   wallet?: { address: string; chain: string } | null;
 };
+
+/** Why a session ended, so the sign-in screen can explain it. */
+export type SignOutReason = "timeout" | "expired" | "switched" | null;
 
 type AuthState = {
   user: AuthUser | null;
   accessToken: string | null;
   /** idle → still bootstrapping; then authenticated | unauthenticated */
   status: "idle" | "authenticated" | "unauthenticated";
+  signOutReason: SignOutReason;
   setAuth: (user: AuthUser, accessToken: string) => void;
   setAccessToken: (token: string | null) => void;
   setUser: (user: AuthUser | null) => void;
-  clear: () => void;
+  clear: (reason?: SignOutReason) => void;
 };
 
 /** Backend roles are uppercase (ADMIN/OPERATOR); the UI uses lowercase. */
@@ -35,8 +38,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   accessToken: null,
   status: "idle",
-  setAuth: (user, accessToken) => set({ user, accessToken, status: "authenticated" }),
+  signOutReason: null,
+  setAuth: (user, accessToken) =>
+    set({ user, accessToken, status: "authenticated", signOutReason: null }),
   setAccessToken: (accessToken) => set({ accessToken }),
   setUser: (user) => set({ user }),
-  clear: () => set({ user: null, accessToken: null, status: "unauthenticated" }),
+  clear: (reason = null) =>
+    set({
+      user: null,
+      accessToken: null,
+      status: "unauthenticated",
+      signOutReason: reason,
+    }),
 }));

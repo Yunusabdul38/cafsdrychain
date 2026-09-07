@@ -1,5 +1,6 @@
 "use client";
 
+import { titleCase } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
@@ -72,8 +73,8 @@ export default function OperatorOverview() {
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="truncate font-medium text-brand-dark">{b.product}</span>
-                              <StageBadge stage={b.stage} />
+                              <span className="truncate font-medium text-brand-dark">{titleCase(b.product)}</span>
+                              <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
                             </div>
                             <p className="mt-0.5 font-mono text-xs text-muted">{b.id}</p>
                           </div>

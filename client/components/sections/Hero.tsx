@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Hero() {
   return (
     <section id="home" className="relative isolate overflow-hidden">
@@ -10,7 +12,7 @@ export default function Hero() {
           style={{ animation: "rise 0.7s ease-out both" }}
         >
           <span className="h-2 w-2 rounded-full bg-brand" />
-          Traceability secured on the Base blockchain
+          Traceability secured on the blockchain
         </span>
 
         <h1
@@ -19,34 +21,34 @@ export default function Hero() {
         >
           Every Batch.
           <br />
-          Verified. On-Chain.
+          Verified. On Chain.
         </h1>
 
         <p
           className="mt-6 max-w-2xl text-md leading-relaxed text-white/90 drop-shadow-[0_2px_12px_rgba(6,28,48,0.4)] sm:text-xl"
           style={{ animation: "rise 0.8s ease-out 0.12s both" }}
         >
-          DryChain brings end-to-end traceability to solar-dried produce,
+          DryChain brings end to end traceability to solar dried produce,
           tracking every batch from collection to delivery, with an immutable
-          record secured on the Base blockchain.
+          record secured on the blockchain.
         </p>
 
         <div
           className="mt-9 flex items-center gap-3"
           style={{ animation: "rise 0.8s ease-out 0.2s both" }}
         >
-          <a
+          <Link
             href="/login"
             className="w-full rounded-full bg-white px-9 py-4 text-base font-semibold text-brand-dark shadow-lg transition-transform hover:-translate-y-0.5 sm:w-auto"
           >
             Login
-          </a>
-          <a
+          </Link>
+          <Link
             href="/verify"
             className="w-full rounded-full bg-brand px-9 py-4 text-base font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5 sm:w-auto"
           >
             Verify
-          </a>
+          </Link>
         </div>
       </div>
     </section>

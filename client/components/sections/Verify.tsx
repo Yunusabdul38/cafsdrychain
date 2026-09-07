@@ -17,7 +17,7 @@ export default function Verify() {
               </h2>
               <p className="mt-4 max-w-lg text-lg text-white/75">
                 Scan the QR code on any package or enter its Batch ID to reveal
-                the complete, on-chain history — from the farm it came from to
+                the complete, on chain history, from the farm it came from to
                 the moment it was delivered.
               </p>
 
@@ -40,7 +40,7 @@ export default function Verify() {
                 </button>
               </form>
               <p className="mt-3 text-sm text-white/50">
-                No account needed — verification is open to everyone.
+                No account needed. Verification is open to everyone.
               </p>
             </div>
 
@@ -60,7 +60,7 @@ export default function Verify() {
                     </p>
                   </div>
                   <span className="flex h-9 items-center gap-1.5 rounded-full bg-mint px-3 text-xs font-semibold text-brand">
-                    <span className="h-2 w-2 rounded-full bg-brand" /> On-chain
+                    <span className="h-2 w-2 rounded-full bg-brand" /> On chain
                   </span>
                 </div>
 
@@ -70,7 +70,7 @@ export default function Verify() {
 
                 <dl className="mt-5 space-y-2.5 text-sm">
                   {[
-                    ["Product", "Sun-dried Mango"],
+                    ["Product", "Sun dried Mango"],
                     ["Source", "Ola Farms · Oyo"],
                     ["Moisture", "12%"],
                     ["Status", "Delivered"],

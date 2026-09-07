@@ -5,7 +5,7 @@ import { ShieldIcon, QrIcon, LinkIcon } from "@/components/icons";
 const points = [
   { icon: QrIcon, title: "Scan or enter", text: "Use the Batch ID printed on the package." },
   { icon: ShieldIcon, title: "See the full history", text: "Source, drying, storage, and delivery." },
-  { icon: LinkIcon, title: "Verified on Base", text: "Backed by an immutable blockchain record." },
+  { icon: LinkIcon, title: "Verified on chain", text: "Backed by an immutable blockchain record." },
 ];
 
 export default function VerifyPage() {
@@ -20,7 +20,7 @@ export default function VerifyPage() {
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-[15px] text-muted">
           Enter the Batch ID from your package to reveal its complete,
-          tamper-resistant journey — no account needed.
+          tamper resistant journey. No account needed.
         </p>
       </div>
 

@@ -4,9 +4,9 @@ import Logo from "@/components/ui/Logo";
 import { QrIcon, ShieldIcon, LinkIcon } from "@/components/icons";
 
 const points = [
-  { icon: ShieldIcon, text: "Tamper-resistant batch records" },
+  { icon: ShieldIcon, text: "Tamper resistant batch records" },
   { icon: QrIcon, text: "Instant QR verification" },
-  { icon: LinkIcon, text: "Immutable history on Base" },
+  { icon: LinkIcon, text: "Immutable history on chain" },
 ];
 
 export default function AuthShell({ children }: { children: ReactNode }) {
@@ -18,11 +18,11 @@ export default function AuthShell({ children }: { children: ReactNode }) {
 
         <div className="max-w-md">
           <h2 className="text-4xl font-semibold leading-tight">
-            Every batch, verified and on-chain.
+            Every batch, verified and on chain.
           </h2>
           <p className="mt-4 text-white/70">
             Sign in to register produce, track drying, and keep an immutable
-            record of every step — from the dryer to delivery.
+            record of every step, from the dryer to delivery.
           </p>
 
           <ul className="mt-8 space-y-3">

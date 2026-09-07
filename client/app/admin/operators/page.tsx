@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { Card } from "@/components/ui/Card";
+import Modal from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { LinkButton } from "@/components/ui/Button";
-import { LoadingState, ErrorState, EmptyState } from "@/components/dashboard/States";
+import { Spinner, LoadingState, ErrorState, EmptyState } from "@/components/dashboard/States";
+import { useResendInvite } from "@/lib/hooks/useInvite";
+import { ApiError } from "@/lib/api";
 import { useUsers, useUpdateUserStatus, useDeleteUser, type ApiUser } from "@/lib/hooks/useUsers";
-import { formatDate } from "@/lib/utils";
-import { PlusIcon, UsersIcon, TrashIcon, CloseIcon, MoreVerticalIcon } from "@/components/icons";
+import { formatDate, titleCase } from "@/lib/utils";
+import { PlusIcon, UsersIcon, TrashIcon, MoreVerticalIcon, CheckIcon, CloseIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/store/auth";
 
@@ -24,6 +27,15 @@ export default function AdminOperators() {
   const currentUser = useAuthStore((s) => s.user);
   const { data: users, isLoading, isError, refetch } = useUsers();
   const updateStatus = useUpdateUserStatus();
+  const resendInvite = useResendInvite();
+  // Feedback lives at page level: the desktop menu closes on click, so a label
+  // inside it was never seen.
+  const [resend, setResend] = useState<{
+    status: "sending" | "sent" | "error";
+    id: string;
+    email: string;
+    message?: string;
+  } | null>(null);
   const deleteUserMutation = useDeleteUser();
 
   const [confirmingDeleteUser, setConfirmingDeleteUser] = useState<ApiUser | null>(null);
@@ -48,14 +60,33 @@ export default function AdminOperators() {
     };
   }, [activeMenuUserId]);
 
-  const handleToggleStatus = async (id: string, currentStatus: "ACTIVE" | "INACTIVE") => {
+  const handleToggleStatus = async (id: string, currentStatus: ApiUser["status"]) => {
     try {
       await updateStatus.mutateAsync({
         id,
         status: currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE",
       });
+    } catch {
+      // The list refetches; a failed toggle simply stays as it was.
+    }
+  };
+
+  const handleResendInvite = async (user: { id: string; email: string }) => {
+    setResend({ status: "sending", id: user.id, email: user.email });
+    try {
+      await resendInvite.mutateAsync(user.id);
+      setResend({ status: "sent", id: user.id, email: user.email });
+      setTimeout(() => setResend(null), 8000);
     } catch (err) {
-      console.error("Failed to update status:", err);
+      setResend({
+        status: "error",
+        id: user.id,
+        email: user.email,
+        message:
+          err instanceof ApiError
+            ? err.message
+            : "Could not send the invitation. Please try again.",
+      });
     }
   };
 
@@ -69,7 +100,7 @@ export default function AdminOperators() {
       } else {
         setDeleteResultMsg(res.message);
       }
-    } catch (err) {
+    } catch {
       setDeleteError("Failed to delete user. Please try again.");
     }
   };
@@ -85,6 +116,52 @@ export default function AdminOperators() {
           </LinkButton>
         }
       />
+
+      {resend && (
+        <div
+          className={
+            "mb-5 flex items-start gap-2.5 rounded-2xl border px-4 py-3 text-sm " +
+            (resend.status === "error"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-brand/20 bg-mint/40 text-brand-dark")
+          }
+        >
+          {resend.status === "sending" ? (
+            <Spinner className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-brand" />
+          ) : resend.status === "sent" ? (
+            <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+          ) : (
+            <CloseIcon className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          )}
+          <div className="min-w-0 flex-1">
+            {resend.status === "sending" && (
+              <p>
+                Sending an invitation to{" "}
+                <span className="font-semibold">{resend.email}</span>…
+              </p>
+            )}
+            {resend.status === "sent" && (
+              <p>
+                Invitation sent to{" "}
+                <span className="font-semibold">{resend.email}</span>. The link
+                works once and expires in 72 hours. Any earlier link no longer
+                works.
+              </p>
+            )}
+            {resend.status === "error" && <p>{resend.message}</p>}
+          </div>
+          {resend.status !== "sending" && (
+            <button
+              type="button"
+              onClick={() => setResend(null)}
+              aria-label="Dismiss"
+              className="shrink-0 text-muted transition-colors hover:text-brand-dark"
+            >
+              <CloseIcon className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
 
       {isLoading ? (
         <LoadingState />
@@ -175,20 +252,32 @@ export default function AdminOperators() {
                       <div className="mt-3 flex items-center justify-between border-t border-black/[0.04] pt-3">
                         <div className="flex items-center gap-2 text-xs text-muted">
                           <Badge className="bg-sky-soft text-sky">{roleLabel[u.role.toLowerCase()] ?? u.role}</Badge>
-                          <span>{u.location ?? "—"}</span>
+                          <span>{titleCase(u.location) ?? "—"}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           {u.id === currentUser?.id ? (
                             <span className="text-xs text-muted font-medium">Current session</span>
                           ) : (
                             <>
-                              <button
-                                onClick={() => handleToggleStatus(u.id, u.status)}
-                                className="text-xs font-semibold text-brand hover:underline"
-                                disabled={updateStatus.isPending}
-                              >
-                                {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                              </button>
+                              {u.status === "PENDING" ? (
+                                <button
+                                  onClick={() => handleResendInvite(u)}
+                                  className="text-xs font-semibold text-brand hover:underline disabled:opacity-50"
+                                  disabled={resend?.status === "sending"}
+                                >
+                                  {resend?.status === "sending" && resend.id === u.id
+                                    ? "Sending…"
+                                    : "Resend invitation"}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleToggleStatus(u.id, u.status)}
+                                  className="text-xs font-semibold text-brand hover:underline"
+                                  disabled={updateStatus.isPending}
+                                >
+                                  {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                                </button>
+                              )}
                               <button
                                 onClick={() => setConfirmingDeleteUser(u)}
                                 className="text-muted hover:text-red-600 p-1"
@@ -238,7 +327,7 @@ export default function AdminOperators() {
                         <td className="px-5 py-3.5">
                           <Badge className="bg-sky-soft text-sky">{roleLabel[u.role.toLowerCase()] ?? u.role}</Badge>
                         </td>
-                        <td className="px-5 py-3.5 text-muted">{u.location ?? "—"}</td>
+                        <td className="px-5 py-3.5 text-muted">{titleCase(u.location) ?? "—"}</td>
                         <td className="px-5 py-3.5 font-mono text-xs text-muted">
                           {u.wallet ? `${u.wallet.address.slice(0, 6)}…${u.wallet.address.slice(-4)}` : "—"}
                         </td>
@@ -264,16 +353,29 @@ export default function AdminOperators() {
 
                               {activeMenuUserId === u.id && (
                                 <div className="absolute right-5 top-11 z-20 w-36 rounded-xl border border-black/[0.08] bg-white shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150 text-left">
-                                  <button
-                                    onClick={() => {
-                                      handleToggleStatus(u.id, u.status);
-                                      setActiveMenuUserId(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2.5 text-xs font-semibold text-brand-dark hover:bg-black/[0.03] transition-colors"
-                                    disabled={updateStatus.isPending}
-                                  >
-                                    {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
-                                  </button>
+                                  {u.status === "PENDING" ? (
+                                    <button
+                                      onClick={() => {
+                                        handleResendInvite(u);
+                                        setActiveMenuUserId(null);
+                                      }}
+                                      disabled={resend?.status === "sending"}
+                                      className="w-full px-3 py-2 text-left text-xs font-medium text-brand hover:bg-mint/50 disabled:opacity-50"
+                                    >
+                                      Resend invitation
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        handleToggleStatus(u.id, u.status);
+                                        setActiveMenuUserId(null);
+                                      }}
+                                      className="w-full text-left px-4 py-2.5 text-xs font-semibold text-brand-dark hover:bg-black/[0.03] transition-colors"
+                                      disabled={updateStatus.isPending}
+                                    >
+                                      {u.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => {
                                       setConfirmingDeleteUser(u);
@@ -300,19 +402,17 @@ export default function AdminOperators() {
 
       {/* Confirmation Modal */}
       {confirmingDeleteUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-md p-6 relative bg-white shadow-xl animate-in fade-in zoom-in duration-200">
-            <button
-              onClick={() => {
-                setConfirmingDeleteUser(null);
-                setDeleteResultMsg(null);
-                setDeleteError(null);
-              }}
-              className="absolute right-4 top-4 text-muted hover:text-brand-dark"
-            >
-              <CloseIcon className="h-5 w-5" />
-            </button>
-            <h3 className="text-lg font-semibold text-brand-dark">Delete user account</h3>
+        <Modal
+          onClose={() => {
+            setConfirmingDeleteUser(null);
+            setDeleteResultMsg(null);
+            setDeleteError(null);
+          }}
+          labelledBy="delete-user-title"
+        >
+            <h3 id="delete-user-title" className="text-lg font-semibold text-brand-dark">
+              Delete user account
+            </h3>
             
             {deleteResultMsg ? (
               <div className="mt-4">
@@ -363,14 +463,20 @@ export default function AdminOperators() {
                 </div>
               </div>
             )}
-          </Card>
-        </div>
+        </Modal>
       )}
     </>
   );
 }
 
 function StatusPill({ status }: { status: ApiUser["status"] }) {
+  if (status === "PENDING") {
+    return (
+      <Badge className="bg-[#FFF3E0] text-[#B4740B]" dot="bg-[#B4740B]">
+        Invited
+      </Badge>
+    );
+  }
   return status === "ACTIVE" ? (
     <Badge className="bg-mint text-brand" dot="bg-brand">Active</Badge>
   ) : (

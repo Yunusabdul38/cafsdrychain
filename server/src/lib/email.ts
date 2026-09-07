@@ -88,7 +88,7 @@ export async function sendPasswordResetEmail(to: string, name: string, link: str
   }
 }
 
-export async function sendInviteEmail(to: string, name: string, tempPassword: string, role?: string) {
+export async function sendInviteEmail(to: string, name: string, link: string, role?: string) {
   if (!env.RESEND_API_KEY) {
     logger.warn({ to }, 'RESEND_API_KEY not set — skipping invite email');
     return;
@@ -129,7 +129,7 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
           <td style="padding: 32px 24px; text-align: left;">
             <h2 style="margin-top: 0; color: #0c3227; font-size: 20px; font-weight: 600; line-height: 1.3;">Welcome to CAFS DryChain, ${name}</h2>
             <p style="color: #4a5568; font-size: 15px; line-height: 1.5; margin-bottom: 24px;">
-              An account has been created for you as an <strong>${roleLabel}</strong>. Sign in to your workspace to set up your password and get started.
+              An account has been created for you as an <strong>${roleLabel}</strong>. Set a password to get started.
             </p>
             
             <!-- Personalized Role Info -->
@@ -140,14 +140,15 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
               </p>
             </div>
             
-            <!-- Account Credentials -->
+            <!-- Sign in identity (no secret travels in this email) -->
             <table width="100%" cellpadding="12" cellspacing="0" border="0" style="background-color: #f7f9f8; border-radius: 12px; margin-bottom: 28px;">
               <tr>
                 <td style="font-size: 14px; color: #4a5568; line-height: 1.6;">
-                  <strong>Email:</strong> <span style="font-family: monospace; color: #0c3227; font-size: 14px;">${to}</span><br />
-                  <strong>Temporary Password:</strong> <code style="background-color: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 14px; color: #0c3227;">${tempPassword}</code>
-                  <p style="color: #c53030; font-size: 13px; font-weight: 600; margin-top: 8px; margin-bottom: 0; line-height: 1.4;">
-                    ⚠️ Important: For security reasons, you must reset this temporary password immediately after logging in.
+                  <strong>You will sign in with:</strong>
+                  <span style="font-family: monospace; color: #0c3227; font-size: 14px;">${to}</span>
+                  <p style="color: #4a5568; font-size: 13px; margin-top: 8px; margin-bottom: 0; line-height: 1.5;">
+                    Choose your own password using the button below. The link can
+                    be used once and expires in 72 hours.
                   </p>
                 </td>
               </tr>
@@ -157,8 +158,8 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td align="left">
-                  <a href="${env.APP_URL}/login" style="background-color: #2ca873; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 12px; font-size: 15px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(44,168,115,0.2);">
-                    Sign In & Set Password
+                  <a href="${link}" style="background-color: #2ca873; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 12px; font-size: 15px; font-weight: 600; display: inline-block; box-shadow: 0 4px 6px rgba(44,168,115,0.2);">
+                    Set your password
                   </a>
                 </td>
               </tr>
@@ -183,7 +184,7 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
     const { data, error } = await resend.emails.send({
       from: 'cafsdrychain@cafsdrychain.com',
       to,
-      subject: 'Your CAFS DryChain account invitation',
+      subject: 'Set up your CAFS DryChain account',
       html: htmlContent,
     });
     if (error) {
@@ -196,3 +197,57 @@ export async function sendInviteEmail(to: string, name: string, tempPassword: st
   }
 }
 
+
+/**
+ * Deliver a public enquiry from the marketing site.
+ *
+ * With no CONTACT_EMAIL configured the message is logged rather than dropped,
+ * the same fallback the password reset link uses, so a misconfiguration is
+ * visible instead of silently losing what someone wrote.
+ */
+export async function sendContactMessage(input: {
+  name: string;
+  email: string;
+  organization?: string;
+  message: string;
+}) {
+  const to = env.CONTACT_EMAIL;
+
+  if (!to || !env.RESEND_API_KEY) {
+    logger.warn(
+      { input, reason: !to ? 'CONTACT_EMAIL not set' : 'RESEND_API_KEY not set' },
+      'Contact form message could not be emailed — logged instead'
+    );
+    return;
+  }
+
+  const escape = (v: string) =>
+    v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'cafsdrychain@cafsdrychain.com',
+      to,
+      reply_to: input.email,
+      subject: `Website enquiry from ${input.name}`,
+      html: `
+        <h2 style="font-family:sans-serif;color:#0c3227;">New enquiry</h2>
+        <p style="font-family:sans-serif;color:#4a5568;">
+          <strong>Name:</strong> ${escape(input.name)}<br />
+          <strong>Email:</strong> ${escape(input.email)}<br />
+          <strong>Organization:</strong> ${escape(input.organization ?? 'Not given')}
+        </p>
+        <p style="font-family:sans-serif;color:#0c3227;white-space:pre-wrap;">${escape(
+          input.message
+        )}</p>
+      `,
+    });
+    if (error) {
+      logger.error({ error, input }, 'Resend rejected the contact message');
+      return;
+    }
+    logger.info({ id: data?.id, to }, 'Contact message sent');
+  } catch (err) {
+    logger.error({ err, input }, 'Failed to send contact message');
+  }
+}

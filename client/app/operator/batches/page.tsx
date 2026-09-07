@@ -7,7 +7,7 @@ import { LinkButton } from "@/components/ui/Button";
 import { LoadingState, ErrorState, EmptyState } from "@/components/dashboard/States";
 import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
-import { PlusIcon, ListIcon } from "@/components/icons";
+import { ListIcon } from "@/components/icons";
 import { LiveIndicator } from "@/components/ui/LiveIndicator";
 
 export default function OperatorBatches() {
@@ -20,11 +20,6 @@ export default function OperatorBatches() {
         <PageHeader
           title="Batches"
           description="Every batch registered at your hub."
-          action={
-            <LinkButton href="/operator/register">
-              <PlusIcon className="h-5 w-5" /> Register
-            </LinkButton>
-          }
         />
         <LiveIndicator dataUpdatedAt={dataUpdatedAt} className="mt-1 shrink-0" />
       </div>

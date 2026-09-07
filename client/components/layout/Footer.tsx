@@ -44,8 +44,8 @@ export default function Footer() {
               </span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
-              End-to-end traceability for solar-dried produce every batch
-              verified and secured on the Base blockchain.
+              End to end traceability for solar dried produce every batch
+              verified and secured on the blockchain.
             </p>
           </div>
 
@@ -74,7 +74,7 @@ export default function Footer() {
           <p>© {new Date().getFullYear()} CAFS DryChain. All rights reserved.</p>
           <p className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-brand" />
-            Secured on Base
+            Secured on chain
           </p>
         </div>
       </div>

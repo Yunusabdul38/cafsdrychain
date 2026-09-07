@@ -1,17 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
-import { useLogin } from "@/lib/hooks/useAuth";
+import { useLogin, useLogout } from "@/lib/hooks/useAuth";
+import { useAuthStore } from "@/lib/store/auth";
 import { ApiError } from "@/lib/api";
 import { Spinner } from "@/components/dashboard/States";
+
+/** Where a signed-in user belongs. */
+const homeFor = (role: string) => (role === "admin" ? "/admin" : "/operator");
 
 export default function LoginForm() {
   const router = useRouter();
   const login = useLogin();
+  const logout = useLogout();
+  const { user, status } = useAuthStore();
+  const reason = useSearchParams().get("reason");
+
+  // Already signed in? There is nothing to do here — go where they belong.
+  useEffect(() => {
+    if (status === "authenticated" && user) {
+      router.replace(homeFor(user.role));
+    }
+  }, [status, user, router]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +52,9 @@ export default function LoginForm() {
     }
 
     try {
-      const { user } = await login.mutateAsync({ email, password });
+      const { user: signedIn } = await login.mutateAsync({ email, password });
       // Route by the role the backend assigned — not a client-side choice.
-      router.push(user.role === "admin" ? "/admin" : "/operator");
+      router.push(homeFor(signedIn.role));
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.details && typeof err.details === "object") {
@@ -54,8 +68,67 @@ export default function LoginForm() {
     }
   };
 
+  const clashError =
+    login.error instanceof ApiError && login.error.status === 409 ? login.error : null;
+
+  // A new tab starts "idle" until the refresh cookie is checked. Showing the
+  // form during that window is what let a second person sign in over an active
+  // session, so nothing is offered until we know who holds this browser.
+  if (status === "idle" || (status === "authenticated" && user)) {
+    return (
+      <div className="py-4">
+        <h1 className="text-3xl font-semibold tracking-tight text-brand-dark">
+          {status === "idle" ? "Checking your session…" : "Taking you to your dashboard…"}
+        </h1>
+        <p className="mt-2 flex items-center gap-2 text-[15px] text-muted">
+          <Spinner className="h-4 w-4 animate-spin text-brand" /> One moment.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
+      {reason === "timeout" && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">Session expired</p>
+          <p className="mt-1 leading-relaxed">
+            You were signed out after an hour of inactivity. Please sign in
+            again to continue.
+          </p>
+        </div>
+      )}
+      {reason === "expired" && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">Session expired</p>
+          <p className="mt-1 leading-relaxed">
+            Your session ended before that action could be completed. Sign in
+            again. Nothing was saved.
+          </p>
+        </div>
+      )}
+      {reason === "switched" && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">Signed out for your safety</p>
+          <p className="mt-1 leading-relaxed">
+            A different account signed in on this browser, so this session was
+            ended rather than continued as someone else.
+          </p>
+        </div>
+      )}
+      {clashError && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">Another account is signed in here</p>
+          <p className="mt-1 leading-relaxed">{clashError.message}</p>
+          <button
+            type="button"
+            onClick={() => logout.mutate()}
+            className="mt-2 text-sm font-semibold text-brand hover:underline"
+          >
+            Sign out that account
+          </button>
+        </div>
+      )}
       <h1 className="text-3xl font-semibold tracking-tight text-brand-dark">
         Welcome back
       </h1>
@@ -77,7 +150,7 @@ export default function LoginForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@cafsdrychain.io"
+          placeholder="folake@cafsdrychain.io"
           error={fieldErrors.email?.[0]}
         />
         <div>
@@ -112,18 +185,6 @@ export default function LoginForm() {
           )}
         </Button>
       </form>
-
-      <p className="mt-6 text-center text-sm text-muted">
-        Accounts are provisioned by your administrator.
-        <br />
-        Need access?{" "}
-        <Link
-          href="#"
-          className="font-semibold text-brand hover:underline"
-        >
-          Contact your admin
-        </Link>
-      </p>
     </div>
   );
 }

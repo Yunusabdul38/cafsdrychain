@@ -26,7 +26,20 @@ async function refreshAccessToken(): Promise<string | null> {
     })
       .then(async (res) => {
         if (!res.ok) return null;
-        const data = (await res.json()) as { accessToken: string };
+        const data = (await res.json()) as {
+          accessToken: string;
+          user?: { id: string };
+        };
+
+        // The refresh cookie is per-browser. If it now belongs to someone else,
+        // adopting the token would silently continue this tab as that person —
+        // so drop the session and make them sign in again instead.
+        const current = useAuthStore.getState().user;
+        if (data.user && current && data.user.id !== current.id) {
+          useAuthStore.getState().clear("switched");
+          return null;
+        }
+
         useAuthStore.getState().setAccessToken(data.accessToken);
         return data.accessToken;
       })
@@ -62,7 +75,11 @@ async function request<T>(path: string, options: Options = {}): Promise<T> {
     if (token) {
       res = await doFetch(token);
     } else {
-      useAuthStore.getState().clear();
+      // The session could not be renewed — it expired, was revoked, or the
+      // account was deactivated. Record why, so the sign-in screen can say so
+      // rather than dumping them on a blank form mid-task.
+      const wasSignedIn = useAuthStore.getState().status === "authenticated";
+      useAuthStore.getState().clear(wasSignedIn ? "expired" : null);
     }
   }
 

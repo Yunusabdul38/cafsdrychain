@@ -279,15 +279,6 @@ export function DownloadIcon(props: IconProps) {
   );
 }
 
-export function TruckIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M3 6h11v9H3zM14 9h4l3 3v3h-7z" />
-      <circle cx="7" cy="18" r="1.6" />
-      <circle cx="17.5" cy="18" r="1.6" />
-    </svg>
-  );
-}
 
 export function FileIcon(props: IconProps) {
   return (
@@ -307,14 +298,6 @@ export function BuildingIcon(props: IconProps) {
   );
 }
 
-export function UserIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21a8 8 0 0 1 16 0" />
-    </svg>
-  );
-}
 
 export function TrashIcon(props: IconProps) {
   return (
@@ -330,6 +313,35 @@ export function MoreVerticalIcon(props: IconProps) {
       <circle cx="12" cy="12" r="1.5" />
       <circle cx="12" cy="5" r="1.5" />
       <circle cx="12" cy="19" r="1.5" />
+    </svg>
+  );
+}
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+export function ExternalLinkIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  );
+}
+
+export function NoteIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M15.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6.5Z" />
+      <path d="M15 3v4a2 2 0 0 0 2 2h4" />
+      <path d="M9 13h6M9 17h4" />
     </svg>
   );
 }

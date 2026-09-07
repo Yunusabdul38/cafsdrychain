@@ -31,7 +31,6 @@ async function main() {
         status: 'ACTIVE',
         location: 'HQ',
         passwordHash,
-        mustChangePassword: true,
       },
     });
     if (isDerivationConfigured()) {

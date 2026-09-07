@@ -1,5 +1,6 @@
 "use client";
 
+import { titleCase } from "@/lib/utils";
 import { useMemo } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { StatGrid } from "@/components/dashboard/StatCard";
@@ -16,20 +17,48 @@ export default function AdminReports() {
   const batches = useMemo(() => (data ? toUiBatches(data) : []), [data]);
 
   const totalFresh = batches.reduce((s, b) => s + b.freshWeight, 0);
-  const totalDried = batches.reduce((s, b) => s + (b.finalWeight ?? 0), 0);
+
+  // Only batches that finished drying have a final weight, so this covers a
+  // smaller set than fresh intake. The hints say so, because comparing the two
+  // totals directly would read as a yield figure and be wrong.
+  const dried = batches.filter((b) => b.finalWeight !== undefined);
+  const totalDried = dried.reduce((s, b) => s + (b.finalWeight ?? 0), 0);
+
   const moistureVals = batches.map((b) => b.moisture).filter((m): m is number => m !== undefined);
+  // Kept to one decimal: readings like 0.4% rounded to a whole number showed 0%.
   const avgMoisture = moistureVals.length
-    ? Math.round(moistureVals.reduce((s, m) => s + m, 0) / moistureVals.length)
+    ? moistureVals.reduce((s, m) => s + m, 0) / moistureVals.length
     : 0;
 
-  const byProduct = groupCount(batches.map((b) => b.product));
-  const byHub = groupCount(batches.map((b) => b.location));
+  const plural = (n: number, word: string) =>
+    `${n} ${n === 1 ? word : word === "batch" ? "batches" : word + "s"}`;
+
+  const byProduct = groupCount(batches.map((b) => titleCase(b.product)));
+  const byHub = groupCount(batches.map((b) => titleCase(b.location)));
 
   const stats = [
-    { label: "Total batches", value: String(batches.length), hint: "all hubs" },
-    { label: "Fresh intake", value: `${(totalFresh / 1000).toFixed(1)}t`, hint: `${totalFresh} kg` },
-    { label: "Dried output", value: `${(totalDried / 1000).toFixed(1)}t`, hint: `${totalDried} kg` },
-    { label: "Avg moisture", value: `${avgMoisture}%`, hint: "final" },
+    {
+      label: "Batches registered",
+      value: String(batches.length),
+      hint: "across all hubs",
+    },
+    {
+      label: "Fresh weight in",
+      value: `${totalFresh.toLocaleString()} kg`,
+      hint: `from ${plural(batches.length, "batch")}`,
+    },
+    {
+      label: "Dried weight out",
+      value: `${totalDried.toLocaleString()} kg`,
+      hint: `from ${dried.length} finished`,
+    },
+    {
+      label: "Average moisture",
+      value: `${avgMoisture.toFixed(1)}%`,
+      hint: moistureVals.length
+        ? `${plural(moistureVals.length, "reading")} recorded`
+        : "none recorded yet",
+    },
   ];
 
   return (
@@ -46,15 +75,33 @@ export default function AdminReports() {
         <>
           <StatGrid stats={stats} />
 
-          <div className="mt-6 print:hidden">
-            <Card className="p-5">
-              <p className="text-sm font-semibold text-brand-dark">Generate a report</p>
-              <p className="mb-4 mt-1 text-sm text-muted">
-                Export a full traceability report for regulators and buyers.
-              </p>
-              <ReportActions batches={batches} />
-            </Card>
-          </div>
+          {/* Export panel — reads as a deliberate deliverable, not a stray button */}
+          <Card className="mt-6 overflow-hidden print:hidden">
+            <div className="flex flex-col gap-5 bg-mint/30 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="flex gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-brand">
+                  <FileIcon className="h-6 w-6" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-brand-dark">Traceability report</p>
+                  <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted">
+                    Every batch with its category, weights, drying record and
+                    blockchain status, laid out for regulators and buyers.
+                  </p>
+                  <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                    <span className="font-medium text-brand-dark">
+                      {plural(batches.length, "batch")}
+                    </span>
+                    <span className="text-black/20">·</span>
+                    <span>{plural(byHub.length, "hub")}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="shrink-0">
+                <ReportActions batches={batches} />
+              </div>
+            </div>
+          </Card>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <Card>

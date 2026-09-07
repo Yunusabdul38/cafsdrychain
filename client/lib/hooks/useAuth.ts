@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuthStore, normalizeUser, type AuthUser } from "@/lib/store/auth";
+import { broadcastSignOut } from "@/lib/hooks/useSessionWatch";
 
 export function useLogin() {
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -23,7 +24,10 @@ export function useLogout() {
   const clear = useAuthStore((s) => s.clear);
   return useMutation({
     mutationFn: () => api.post("/api/auth/logout"),
-    onSettled: () => clear(),
+    onSettled: () => {
+      clear();
+      broadcastSignOut();
+    },
   });
 }
 

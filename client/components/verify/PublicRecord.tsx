@@ -1,21 +1,20 @@
-import Link from "next/link";
+import DetailRow from "@/components/ui/DetailRow";
 import type { Batch } from "@/lib/types";
 import { Card, CardHeader } from "@/components/ui/Card";
-import { StageBadge } from "@/components/ui/Badge";
+import { StageBadge, VerifiedBadge } from "@/components/ui/Badge";
+import PageHeader from "@/components/dashboard/PageHeader";
 import StageProgress from "@/components/dashboard/StageProgress";
 import Timeline from "@/components/dashboard/Timeline";
-import { formatDate } from "@/lib/utils";
-import { ChevronLeftIcon, CheckIcon, QrIcon } from "@/components/icons";
+import { formatDate, formatDateTime, cn, titleCase } from "@/lib/utils";
+import { CheckIcon, ClockIcon } from "@/components/icons";
 
-function Row({ label, value }: { label: string; value?: string | number }) {
-  return (
-    <div className="flex items-start justify-between gap-4 px-5 py-3 text-sm">
-      <dt className="shrink-0 text-muted">{label}</dt>
-      <dd className="text-right font-medium text-brand-dark">{value ?? "—"}</dd>
-    </div>
-  );
-}
-
+/**
+ * The public traceability record.
+ *
+ * Deliberately laid out like the operator's batch detail page — same header,
+ * badges, progress bar and card grid — so the record a buyer sees is visibly
+ * the same record the hub works from, not a separate marketing view of it.
+ */
 export default function PublicRecord({
   batch,
   onChainValid,
@@ -24,100 +23,124 @@ export default function PublicRecord({
   onChainValid?: boolean;
 }) {
   const verified = batch.verified || onChainValid;
-  return (
-    <div>
-      <Link
-        href="/verify"
-        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted transition-colors hover:text-brand-dark"
-      >
-        <ChevronLeftIcon className="h-4 w-4" /> Verify another
-      </Link>
 
-      {/* Verification banner — reflects real chain status */}
-      <div
-        className={
-          verified
-            ? "flex items-center gap-4 rounded-2xl border border-brand/30 bg-mint/60 p-5"
-            : "flex items-center gap-4 rounded-2xl border border-[#B4740B]/30 bg-[#FFF3E0] p-5"
-        }
-      >
-        <span
-          className={
-            "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white " +
-            (verified ? "bg-brand" : "bg-[#B4740B]")
-          }
-        >
-          <CheckIcon className="h-6 w-6" />
-        </span>
-        <div className="min-w-0">
-          <p className="font-semibold text-brand-dark">
-            {verified ? "Authentic & verified" : "Recorded — pending confirmation"}
-          </p>
-          <p className="text-sm text-muted">
-            {verified
-              ? "This product's history is secured on the Base blockchain."
-              : "This record exists and is awaiting on-chain confirmation."}
-          </p>
-        </div>
+  return (
+    <>
+      <PageHeader
+        title={titleCase(batch.product)}
+        description={`${titleCase(batch.source)} (${batch.sourceType}) · ${titleCase(
+          batch.location
+        )} · Entered ${formatDate(batch.entryDate)}`}
+        back={{ href: "/verify", label: "Verify another" }}
+      />
+
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <StageBadge stage={batch.stage} />
+        {verified && <VerifiedBadge />}
       </div>
 
-      {/* Summary */}
-      <Card className="mt-5 p-5 sm:p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold text-brand-dark">
-                {batch.product}
-              </h1>
-              <StageBadge stage={batch.stage} />
-            </div>
-            <p className="mt-1 font-mono text-sm text-muted">{batch.id}</p>
-            <p className="mt-1 text-sm text-muted">
-              {batch.source} ({batch.sourceType}) · {batch.location}
-            </p>
-          </div>
-          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border border-black/[0.08] bg-mint p-2">
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`${window.location.origin}/verify/${batch.id}`)}`}
-              alt={`QR code for ${batch.id}`}
-              className="h-20 w-20 bg-white p-1 rounded-lg"
-            />
-          </div>
-        </div>
-        <div className="mt-6">
-          <StageProgress stage={batch.stage} />
-        </div>
+      {/* Progress */}
+      <Card className="mb-6 p-5">
+        <StageProgress stage={batch.stage} />
       </Card>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Product details" />
-          <dl className="divide-y divide-black/[0.06]">
-            <Row label="Product" value={batch.product} />
-            <Row label="Source" value={`${batch.source} (${batch.sourceType})`} />
-            <Row label="Supplier" value={batch.supplier} />
-            <Row label="Fresh weight" value={`${batch.freshWeight} kg`} />
-            <Row label="Delivered" value={formatDate(batch.deliveryDate)} />
-            <Row
-              label="Final weight"
-              value={batch.finalWeight ? `${batch.finalWeight} kg` : undefined}
-            />
-            <Row
-              label="Moisture"
-              value={batch.moisture !== undefined ? `${batch.moisture}%` : undefined}
-            />
-            <Row label="Quality" value={batch.quality} />
-            <Row label="Destination" value={batch.destination} />
-          </dl>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Produce" />
+            <dl className="divide-y divide-black/[0.06]">
+              <DetailRow label="Category" value={titleCase(batch.category)} />
+              <DetailRow label="Product" value={titleCase(batch.product)} />
+              <DetailRow
+                label="Source"
+                value={`${titleCase(batch.source)} (${batch.sourceType})`}
+              />
+              <DetailRow label="Fresh weight" value={`${batch.freshWeight} kg`} />
+              <DetailRow label="Entry date" value={formatDate(batch.entryDate)} />
+              <DetailRow label="Drying hub" value={titleCase(batch.location)} />
+            </dl>
+          </Card>
 
-        <Card>
-          <CardHeader title="Traceability timeline" />
-          <div className="p-5">
-            <Timeline events={batch.timeline} />
-          </div>
-        </Card>
+          <Card>
+            <CardHeader title="Drying record" />
+            <dl className="divide-y divide-black/[0.06]">
+              <DetailRow
+                label="Started"
+                value={batch.dryingStart ? formatDateTime(batch.dryingStart) : undefined}
+              />
+              <DetailRow
+                label="Completed"
+                value={batch.dryingEnd ? formatDateTime(batch.dryingEnd) : undefined}
+              />
+              <DetailRow
+                label="Final weight"
+                value={batch.finalWeight ? `${batch.finalWeight} kg` : undefined}
+              />
+              <DetailRow
+                label="Moisture"
+                value={batch.moisture !== undefined ? `${batch.moisture}%` : undefined}
+              />
+              <DetailRow label="Drying method" value={titleCase(batch.dryingMethod)} />
+              <DetailRow label="Quality" value={titleCase(batch.quality)} />
+            </dl>
+          </Card>
+
+          <Card>
+            <CardHeader title="Storage & distribution" />
+            <dl className="divide-y divide-black/[0.06]">
+              <DetailRow label="Storage location" value={titleCase(batch.storageLocation)} />
+              <DetailRow label="Destination" value={titleCase(batch.destination)} />
+            </dl>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Traceability timeline" />
+            <div className="p-5">
+              <Timeline events={batch.timeline} />
+            </div>
+          </Card>
+        </div>
       </div>
-    </div>
+
+      {/* Verification seal — closes the record, after the evidence above it */}
+      <div className="mt-6 overflow-hidden rounded-2xl border border-black/[0.08] bg-white">
+        <div
+          className={cn(
+            "px-6 py-7 text-center sm:px-8",
+            verified ? "bg-mint/40" : "bg-[#FFF3E0]"
+          )}
+        >
+          <span
+            className={cn(
+              "mx-auto flex h-14 w-14 items-center justify-center rounded-full text-white",
+              verified ? "bg-brand" : "bg-[#B4740B]"
+            )}
+          >
+            {verified ? (
+              <CheckIcon className="h-7 w-7" />
+            ) : (
+              <ClockIcon className="h-7 w-7" />
+            )}
+          </span>
+
+          <h2 className="mt-4 text-xl font-semibold tracking-tight text-brand-dark">
+            {verified ? "Authentic & verified" : "Recorded, pending confirmation"}
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
+            {verified
+              ? "Every record above was written to the blockchain and matches its on chain fingerprint. It cannot be altered after the fact."
+              : "This record exists and has been submitted to the blockchain. It is awaiting on chain confirmation."}
+          </p>
+        </div>
+
+        <div className="border-t border-black/[0.06] px-6 py-3 text-center">
+          <p className="text-[11px] uppercase tracking-wider text-muted">
+            Recorded {formatDate(batch.entryDate)} · CAFS DryChain
+          </p>
+        </div>
+      </div>
+    </>
   );
 }

@@ -43,6 +43,6 @@ export function adminMetrics(batches: Batch[], operatorCount: number): Stat[] {
     { label: "Total batches", value: String(batches.length), hint: `across ${hubs || 0} hubs` },
     { label: "Active drying", value: String(drying), hint: "in progress" },
     { label: "Operators", value: String(operatorCount), hint: "active" },
-    { label: "On-chain records", value: String(countEvents(batches)), hint: "events" },
+    { label: "On chain records", value: String(countEvents(batches)), hint: "events" },
   ];
 }

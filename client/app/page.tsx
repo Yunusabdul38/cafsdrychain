@@ -3,7 +3,6 @@ import Hero from "@/components/sections/Hero";
 import HowItWorks from "@/components/sections/HowItWorks";
 import Features from "@/components/sections/Features";
 import Verify from "@/components/sections/Verify";
-import Contact from "@/components/sections/Contact";
 import Footer from "@/components/layout/Footer";
 
 export default function Home() {
@@ -15,7 +14,6 @@ export default function Home() {
         <HowItWorks />
         <Features />
         <Verify />
-        {/* <Contact /> */}
       </main>
       <Footer />
     </>

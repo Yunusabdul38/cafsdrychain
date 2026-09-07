@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireLiveSession } from '../middleware/auth.js';
 import { advanceBatchSchema, batchIdParam, createBatchSchema } from '../schemas/index.js';
 import * as batchService from '../services/batchService.js';
 import { prisma } from '../lib/prisma.js';
@@ -34,6 +34,7 @@ router.get(
 router.post(
   '/',
   requireRole('OPERATOR'),
+  requireLiveSession,
   validate({ body: createBatchSchema }),
   asyncHandler(async (req, res) => {
     const batch = await batchService.createBatch(req.user!.sub, req.body);
@@ -51,7 +52,8 @@ router.get(
 
 router.post(
   '/:batchId/advance',
-  requireRole('OPERATOR', 'ADMIN'),
+  requireRole('OPERATOR'),
+  requireLiveSession,
   validate({ params: batchIdParam, body: advanceBatchSchema }),
   asyncHandler(async (req, res) => {
     const actor = await prisma.user.findUnique({ where: { id: req.user!.sub } });

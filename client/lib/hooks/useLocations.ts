@@ -16,6 +16,20 @@ export function useLocations() {
   });
 }
 
+export function useUpdateLocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch<{ location: ApiLocation }>(`/api/locations/${id}`, { name }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["locations"] });
+      // A rename cascades to users and batches server-side, so refresh both.
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["batches"] });
+    },
+  });
+}
+
 export function useCreateLocation() {
   const qc = useQueryClient();
   return useMutation({

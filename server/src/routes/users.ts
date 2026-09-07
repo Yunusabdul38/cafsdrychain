@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { asyncHandler } from '../lib/asyncHandler.js';
+import * as authService from '../services/authService.js';
 import { validate } from '../middleware/validate.js';
-import { requireAuth, requireRole } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireLiveSession } from '../middleware/auth.js';
 import { createUserSchema, updateUserStatusSchema } from '../schemas/index.js';
 import * as userService from '../services/userService.js';
 
@@ -9,6 +10,8 @@ const router = Router();
 
 // All user-management endpoints are admin-only.
 router.use(requireAuth, requireRole('ADMIN'));
+// Every route here changes users, so the live-session check applies throughout.
+router.use(requireLiveSession);
 
 router.get(
   '/',
@@ -56,6 +59,15 @@ router.delete(
     }
     const result = await userService.deleteUser(req.params.id);
     res.json(result);
+  })
+);
+
+/** Re-send an invitation; the previous link stops working. */
+router.post(
+  '/:id/invite',
+  asyncHandler(async (req, res) => {
+    await authService.issueInvite(req.params.id);
+    res.json({ ok: true });
   })
 );
 

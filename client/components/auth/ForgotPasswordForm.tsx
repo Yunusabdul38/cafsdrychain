@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { useForgotPassword } from "@/lib/hooks/useAuth";
-import { CheckIcon, ChevronLeftIcon } from "@/components/icons";
+import { CheckIcon } from "@/components/icons";
+import BackLink from "@/components/ui/BackLink";
 import { Spinner } from "@/components/dashboard/States";
 
 export default function ForgotPasswordForm() {
@@ -48,12 +48,7 @@ export default function ForgotPasswordForm() {
           If an account exists for <span className="font-medium text-brand-dark">{email}</span>,
           we&apos;ve sent a link to reset your password. It expires in 1 hour.
         </p>
-        <Link
-          href="/login"
-          className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline"
-        >
-          <ChevronLeftIcon className="h-4 w-4" /> Back to sign in
-        </Link>
+        <BackLink href="/login" label="Back to sign in" className="mt-6" />
       </div>
     );
   }
@@ -75,7 +70,7 @@ export default function ForgotPasswordForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@cafsdrychain.io"
+          placeholder="folake@cafsdrychain.io"
           error={fieldErrors.email?.[0]}
         />
         <Button type="submit" full size="lg" disabled={forgot.isPending}>
@@ -90,12 +85,7 @@ export default function ForgotPasswordForm() {
         </Button>
       </form>
 
-      <Link
-        href="/login"
-        className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline"
-      >
-        <ChevronLeftIcon className="h-4 w-4" /> Back to sign in
-      </Link>
+      <BackLink href="/login" label="Back to sign in" className="mt-6" />
     </div>
   );
 }

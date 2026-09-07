@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "CAFS DryChain",
     short_name: "CAFS",
     description:
-      "End-to-end traceability for solar-dried produce, every batch verified and secured on the Base blockchain.",
+      "End to end traceability for solar dried produce, every batch verified and secured on the blockchain.",
     start_url: "/",
     display: "standalone",
     background_color: "#0a2c12",

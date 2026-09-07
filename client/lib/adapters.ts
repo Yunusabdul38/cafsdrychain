@@ -3,6 +3,7 @@ import type { ApiBatch, ApiStage } from "./hooks/useBatches";
 
 const STAGE_MAP: Record<ApiStage, BatchStage> = {
   REGISTERED: "registered",
+  AWAITING_PAYMENT: "awaiting-payment",
   DRYING: "drying",
   DRIED: "dried",
   STORED: "stored",
@@ -18,22 +19,24 @@ export function apiStage(s: ApiStage): BatchStage {
 export function toUiBatch(b: ApiBatch): Batch {
   return {
     id: b.batchId,
+    category: b.category,
     product: b.product,
     sourceType: b.sourceType,
     source: b.source,
-    supplier: b.supplier,
     freshWeight: b.freshWeight,
     finalWeight: b.finalWeight ?? undefined,
     moisture: b.moisture ?? undefined,
-    deliveryDate: b.deliveryDate,
+    entryDate: b.entryDate,
     dryingStart: b.dryingStart ?? undefined,
     dryingEnd: b.dryingEnd ?? undefined,
+    dryingMethod: b.dryingMethod ?? undefined,
     quality: b.quality ?? undefined,
     storageLocation: b.storageLocation ?? undefined,
-    packaging: b.packaging ?? undefined,
-    transport: b.transport ?? undefined,
     destination: b.destination ?? undefined,
     stage: apiStage(b.stage),
+    payment: b.payment
+      ? { ...b.payment, paidAt: b.payment.paidAt ?? undefined }
+      : undefined,
     operator: b.operator?.name ?? "—",
     location: b.location,
     verified: b.chainStatus === "CONFIRMED",
@@ -43,6 +46,7 @@ export function toUiBatch(b: ApiBatch): Batch {
         stage: apiStage(e.stage),
         title: e.title,
         actor: e.actor,
+        note: e.note ?? undefined,
         timestamp: e.createdAt,
         txHash: e.txHash ?? "",
       })
@@ -61,15 +65,18 @@ import type { PublicRecord } from "./hooks/useVerify";
 export function publicToUiBatch(r: PublicRecord): Batch {
   return {
     id: r.batchId,
+    category: r.category,
     product: r.product,
     sourceType: (r.sourceType as "Farm" | "Market") ?? "Farm",
     source: r.source,
-    supplier: r.supplier,
     freshWeight: r.freshWeight,
     finalWeight: r.finalWeight ?? undefined,
     moisture: r.moisture ?? undefined,
-    deliveryDate: r.deliveryDate,
+    entryDate: r.entryDate,
     quality: r.quality ?? undefined,
+    dryingMethod: r.dryingMethod ?? undefined,
+    dryingStart: r.dryingStart ?? undefined,
+    dryingEnd: r.dryingEnd ?? undefined,
     storageLocation: r.storageLocation ?? undefined,
     destination: r.destination ?? undefined,
     stage: apiStage(r.stage as ApiStage),
@@ -81,6 +88,7 @@ export function publicToUiBatch(r: PublicRecord): Batch {
       stage: apiStage(e.stage as ApiStage),
       title: e.title,
       actor: e.actor,
+      note: e.note ?? undefined,
       timestamp: e.timestamp,
       txHash: e.txHash ?? "",
     })),
@@ -93,7 +101,7 @@ function ledgerStatus(chainStatus?: string, txHash?: string | null): LedgerRecor
   return "pending";
 }
 
-/** Flatten every batch's on-chain events into a ledger, newest first. */
+/** Flatten every batch's on chain events into a ledger, newest first. */
 export function buildLedger(list: ApiBatch[]): LedgerRecord[] {
   return list
     .flatMap((b) =>

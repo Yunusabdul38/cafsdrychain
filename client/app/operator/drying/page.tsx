@@ -9,7 +9,7 @@ import { StageBadge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState } from "@/components/dashboard/States";
 import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
-import { formatDate } from "@/lib/utils";
+import { formatDate, titleCase } from "@/lib/utils";
 import { nextAction } from "@/lib/lifecycle";
 import { ChevronRightIcon, SunIcon } from "@/components/icons";
 import { LiveIndicator } from "@/components/ui/LiveIndicator";
@@ -62,12 +62,12 @@ function Section({ title, empty, batches }: { title: string; empty: string; batc
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-semibold text-brand-dark">{b.product}</span>
-                        <StageBadge stage={b.stage} />
+                        <span className="truncate font-semibold text-brand-dark">{titleCase(b.product)}</span>
+                        <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
                       </div>
                       <p className="mt-0.5 text-xs text-muted">
                         <span className="font-mono">{b.id}</span> · {b.freshWeight} kg · in{" "}
-                        {formatDate(b.deliveryDate)}
+                        {formatDate(b.entryDate)}
                       </p>
                     </div>
                     <Link

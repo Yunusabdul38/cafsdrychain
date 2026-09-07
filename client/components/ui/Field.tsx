@@ -4,6 +4,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useCallback,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
@@ -13,22 +14,26 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { EyeIcon, EyeOffIcon } from "@/components/icons";
 
+/** The only props this walker reads off a child element. */
+type OptionLike = { value?: string | number; children?: React.ReactNode };
+
+/** Flatten `<option>` children (including through fragments) into a list. */
 function extractOptions(node: React.ReactNode, list: { value: string; label: string }[]): void {
   React.Children.forEach(node, (child) => {
-    if (React.isValidElement(child)) {
-      const element = child as React.ReactElement<any>;
-      if (element.type === "option") {
-        const props = element.props;
-        const val = props.value !== undefined ? props.value : props.children;
-        const lbl = typeof props.children === "string" || typeof props.children === "number"
-          ? String(props.children)
+    if (!React.isValidElement<OptionLike>(child)) return;
+
+    const { value, children } = child.props;
+
+    if (child.type === "option") {
+      const val = value !== undefined ? value : children;
+      const label =
+        typeof children === "string" || typeof children === "number"
+          ? String(children)
           : String(val);
-        list.push({ value: String(val), label: lbl });
-      } else if (element.type === React.Fragment) {
-        extractOptions(element.props.children, list);
-      } else if (element.props && element.props.children) {
-        extractOptions(element.props.children, list);
-      }
+      list.push({ value: String(val), label });
+    } else if (children) {
+      // Fragments and wrappers: keep walking for options inside them.
+      extractOptions(children, list);
     }
   });
 }
@@ -150,56 +155,41 @@ export function Select({
   placeholder?: string;
   error?: string;
 } & SelectHTMLAttributes<HTMLSelectElement>) {
-  // Extract options from children
   const optionsList: { value: string; label: string }[] = [];
   extractOptions(children, optionsList);
 
-  // Identify whether it is controlled
   const isControlled = controlledValue !== undefined;
-  
-  // Local state for value (if uncontrolled or fallback)
   const [localValue, setLocalValue] = useState(defaultValue || "");
-
-  // Active value
   const activeValue = isControlled ? String(controlledValue) : String(localValue);
 
-  // State for search query and dropdown open
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-
-  // References
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Close on click outside
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setSearchQuery("");
+  }, []);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        close();
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [close]);
 
-  // Filter options based on search query
   const filteredOptions = optionsList.filter((opt) =>
     opt.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  // Reset search query when dropdown opens/closes
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery("");
-    }
-  }, [isOpen]);
 
   const handleSelectOption = (optValue: string) => {
     if (!isControlled) {
       setLocalValue(optValue);
     }
-    setIsOpen(false);
+    close();
 
     if (onChange) {
       onChange({
@@ -212,7 +202,6 @@ export function Select({
     }
   };
 
-  // Find label of active value
   const activeOption = optionsList.find((opt) => opt.value === activeValue);
   const displayLabel = activeOption ? activeOption.label : activeValue || placeholder;
 
@@ -224,7 +213,7 @@ export function Select({
           id={id}
           type="button"
           disabled={disabled}
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => (isOpen ? close() : setIsOpen(true))}
           className={cn(
             control,
             "h-12 flex items-center justify-between text-left w-full",

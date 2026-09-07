@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Batch, BatchStage } from "@/lib/types";
-import { STAGE_LABEL, STAGE_ORDER } from "@/lib/mock-data";
+import { STAGE_LABEL, STAGE_ORDER } from "@/lib/stages";
 import { cn } from "@/lib/utils";
 import BatchList from "./BatchList";
 import { SearchIcon } from "@/components/icons";

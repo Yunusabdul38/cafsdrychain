@@ -3,16 +3,21 @@ pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import {BatchRegistry} from "../src/BatchRegistry.sol";
-import {BatchRegistryV2} from "../src/mocks/BatchRegistryV2.sol";
+import {RoleManager} from "../src/RoleManager.sol";
 
 /**
- * Upgrades the BatchRegistry proxy to a new implementation via UUPS.
+ * Upgrades the BatchRegistry proxy to the current implementation via UUPS.
+ *
  * The broadcaster must hold DEFAULT_ADMIN_ROLE in the RoleManager.
  *
  * Env: PRIVATE_KEY, BATCH_REGISTRY_ADDRESS (proxy), FORWARDER_ADDRESS.
  *
  * Run: forge script script/UpgradeBatchRegistry.s.sol:UpgradeBatchRegistry \
  *        --rpc-url $RPC_URL --broadcast
+ *
+ * Deliberately upgrades to {BatchRegistry} itself. An earlier revision pointed
+ * at the test mock `BatchRegistryV2`, which would have put a fixture on a live
+ * proxy.
  */
 contract UpgradeBatchRegistry is Script {
     function run() external {
@@ -20,16 +25,48 @@ contract UpgradeBatchRegistry is Script {
         address proxy = vm.envAddress("BATCH_REGISTRY_ADDRESS");
         address forwarder = vm.envAddress("FORWARDER_ADDRESS");
 
+        BatchRegistry live = BatchRegistry(proxy);
+
+        // --- pre-flight ------------------------------------------------------
+        // The forwarder is immutable in the implementation's bytecode. Deploying
+        // a new implementation with a different one silently breaks every
+        // operator's gas-sponsored write, so refuse to proceed on a mismatch.
+        require(
+            live.isTrustedForwarder(forwarder),
+            "Upgrade: FORWARDER_ADDRESS is not the forwarder this proxy trusts"
+        );
+
+        address admin = vm.addr(pk);
+        RoleManager roles = live.roleManager();
+        require(
+            roles.hasRole(roles.DEFAULT_ADMIN_ROLE(), admin),
+            "Upgrade: broadcaster does not hold DEFAULT_ADMIN_ROLE"
+        );
+
+        // Snapshot so the upgrade can be proven non-destructive.
+        uint256 batchesBefore = live.totalBatches();
+        address rolesBefore = address(roles);
+
+        console.log("Proxy:              ", proxy);
+        console.log("Admin:              ", admin);
+        console.log("Batches before:     ", batchesBefore);
+
+        // --- upgrade ---------------------------------------------------------
         vm.startBroadcast(pk);
 
-        // Deploy the new implementation (same forwarder as the current one).
-        BatchRegistryV2 newImpl = new BatchRegistryV2(forwarder);
-        console.log("New implementation:", address(newImpl));
+        BatchRegistry newImpl = new BatchRegistry(forwarder);
+        console.log("New implementation: ", address(newImpl));
 
-        // Perform the upgrade through the proxy (no re-init call needed here).
-        BatchRegistry(proxy).upgradeToAndCall(address(newImpl), "");
-        console.log("Proxy", proxy, "upgraded to", address(newImpl));
+        // No re-initialiser: this revision adds no storage.
+        live.upgradeToAndCall(address(newImpl), "");
 
         vm.stopBroadcast();
+
+        // --- post-flight -----------------------------------------------------
+        require(live.totalBatches() == batchesBefore, "Upgrade: batch count changed");
+        require(address(live.roleManager()) == rolesBefore, "Upgrade: roleManager changed");
+        require(live.isTrustedForwarder(forwarder), "Upgrade: forwarder no longer trusted");
+
+        console.log("Upgrade complete. State preserved.");
     }
 }

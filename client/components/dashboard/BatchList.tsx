@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Batch } from "@/lib/types";
 import { StageBadge } from "@/components/ui/Badge";
-import { formatDate } from "@/lib/utils";
+import { formatDate, titleCase } from "@/lib/utils";
 import { ChevronRightIcon } from "@/components/icons";
 
 export default function BatchList({
@@ -39,15 +39,16 @@ export default function BatchList({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-semibold text-brand-dark">
-                    {b.product}
+                    {titleCase(b.product)}
                   </span>
-                  <StageBadge stage={b.stage} />
+                  <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
                 </div>
                 <p className="mt-1 font-mono text-xs text-muted">{b.id}</p>
                 <p className="mt-1 text-xs text-muted">
-                  {b.source} · {b.freshWeight} kg
+                  {titleCase(b.source)} · {b.finalWeight ?? b.freshWeight} kg{" "}
+                  {b.finalWeight !== undefined ? "dried" : "fresh"}
                   {showOperator ? ` · ${b.operator}` : ""}
-                  {showLocation ? ` · ${b.location}` : ""}
+                  {showLocation ? ` · ${titleCase(b.location)}` : ""}
                 </p>
               </div>
               <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
@@ -71,7 +72,7 @@ export default function BatchList({
                 <th className="px-5 py-3 font-medium">Facility</th>
               )}
               <th className="px-5 py-3 font-medium">Weight</th>
-              <th className="px-5 py-3 font-medium">Delivered</th>
+              <th className="px-5 py-3 font-medium">Entered</th>
               <th className="px-5 py-3 font-medium">Stage</th>
               <th className="px-5 py-3" />
             </tr>
@@ -91,21 +92,28 @@ export default function BatchList({
                   </Link>
                 </td>
                 <td className="px-5 py-3.5 font-medium text-brand-dark">
-                  {b.product}
+                  {titleCase(b.product)}
                 </td>
-                <td className="px-5 py-3.5 text-muted">{b.source}</td>
+                <td className="px-5 py-3.5 text-muted">{titleCase(b.source)}</td>
                 {showOperator && (
                   <td className="px-5 py-3.5 text-muted">{b.operator}</td>
                 )}
                 {showLocation && (
-                  <td className="px-5 py-3.5 text-muted">{b.location}</td>
+                  <td className="px-5 py-3.5 text-muted">{titleCase(b.location)}</td>
                 )}
-                <td className="px-5 py-3.5 text-muted">{b.freshWeight} kg</td>
+                <td className="px-5 py-3.5">
+                  <span className="font-medium text-brand-dark">
+                    {b.finalWeight ?? b.freshWeight} kg
+                  </span>
+                  <span className="ml-1.5 text-xs text-muted">
+                    {b.finalWeight !== undefined ? "dried" : "fresh"}
+                  </span>
+                </td>
                 <td className="px-5 py-3.5 text-muted">
-                  {formatDate(b.deliveryDate)}
+                  {formatDate(b.entryDate)}
                 </td>
                 <td className="px-5 py-3.5">
-                  <StageBadge stage={b.stage} />
+                  <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
                 </td>
                 <td className="px-5 py-3.5 text-right">
                   <Link

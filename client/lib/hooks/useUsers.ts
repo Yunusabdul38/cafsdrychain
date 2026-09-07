@@ -9,7 +9,7 @@ export type ApiUser = {
   name: string;
   email: string;
   role: Role;
-  status: "ACTIVE" | "INACTIVE";
+  status: "PENDING" | "ACTIVE" | "INACTIVE";
   location?: string | null;
   createdAt: string;
   wallet?: { address: string; index: number; chain: string; derivationPath: string } | null;

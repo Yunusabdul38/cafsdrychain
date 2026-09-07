@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { BatchStage } from "@/lib/types";
-import { STAGE_LABEL } from "@/lib/mock-data";
+import { stageLabelFor } from "@/lib/lifecycle";
 
 export function Badge({
   children,
@@ -31,17 +31,30 @@ const stageStyles: Record<BatchStage, string> = {
   dried: "bg-mint text-brand",
   stored: "bg-[#EEF0FF] text-[#4457C7]",
   "in-transit": "bg-[#FDEEE4] text-[#C4622A]",
+  "awaiting-payment": "bg-[#FFF3E0] text-[#B4740B]",
   delivered: "bg-brand-dark text-white",
 };
 
-export function StageBadge({ stage }: { stage: BatchStage }) {
-  return <Badge className={stageStyles[stage]}>{STAGE_LABEL[stage]}</Badge>;
+export function StageBadge({
+  stage,
+  paid,
+}: {
+  stage: BatchStage;
+  /** A paid batch waits at the payment stage until drying starts — say so. */
+  paid?: boolean;
+}) {
+  const settled = stage === "awaiting-payment" && paid;
+  return (
+    <Badge className={settled ? "bg-mint text-brand" : stageStyles[stage]}>
+      {stageLabelFor({ stage, payment: paid ? { status: "PAID" } : undefined })}
+    </Badge>
+  );
 }
 
 export function VerifiedBadge() {
   return (
     <Badge className="bg-mint text-brand" dot="bg-brand">
-      On-chain
+      On chain
     </Badge>
   );
 }

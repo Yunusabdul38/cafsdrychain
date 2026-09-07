@@ -14,6 +14,9 @@ import userRoutes from './routes/users.js';
 import batchRoutes from './routes/batches.js';
 import verifyRoutes from './routes/verify.js';
 import locationRoutes from './routes/locations.js';
+import paymentRoutes, { batchPaymentRoutes } from './routes/payments.js';
+import contactRoutes from './routes/contact.js';
+import adminRoutes from './routes/admin.js';
 
 const app = express();
 
@@ -45,6 +48,10 @@ app.use(
     credentials: true,
   })
 );
+// Webhooks are mounted before the JSON parser: signature verification needs the
+// exact bytes the gateway sent, which a parse-and-reserialise round trip loses.
+app.use('/api/payments', paymentRoutes);
+
 app.use(express.json({ limit: '100kb' })); // bound body size
 app.use(cookieParser());
 app.use(pinoHttp({ logger }));
@@ -57,9 +64,12 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/batches', batchPaymentRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/verify', verifyRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

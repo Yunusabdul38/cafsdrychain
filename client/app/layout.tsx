@@ -50,9 +50,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "CAFS DryChain — Every Batch. Verified. On-Chain.",
+  title: "CAFS DryChain · Every Batch. Verified. On Chain.",
   description:
-    "DryChain brings end-to-end traceability to solar-dried produce, tracking every batch from collection to delivery with an immutable record secured on the Base blockchain.",
+    "DryChain brings end to end traceability to solar dried produce, tracking every batch from collection to delivery with an immutable record secured on the blockchain.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

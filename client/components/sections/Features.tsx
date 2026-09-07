@@ -17,9 +17,9 @@ type Feature = {
 const features: Feature[] = [
   {
     icon: <LinkIcon className="h-6 w-6" />,
-    title: "Immutable on Base",
+    title: "Immutable on chain",
     description:
-      "Every batch event is written to the Base blockchain, creating a permanent record that can't be edited or erased.",
+      "Every batch event is written to the blockchain, creating a permanent record that can't be edited or erased.",
   },
   {
     icon: <QrIcon className="h-6 w-6" />,
@@ -29,9 +29,9 @@ const features: Feature[] = [
   },
   {
     icon: <ShieldIcon className="h-6 w-6" />,
-    title: "Tamper-resistant history",
+    title: "Tamper resistant history",
     description:
-      "Each drying update is time-stamped and locked, giving you an audit trail no one can quietly rewrite.",
+      "Each drying update is time stamped and locked, giving you an audit trail no one can quietly rewrite.",
   },
   {
     icon: <ChartIcon className="h-6 w-6" />,
@@ -43,11 +43,11 @@ const features: Feature[] = [
     icon: <LeafIcon className="h-6 w-6" />,
     title: "Built for solar drying",
     description:
-      "Purpose-built for solar-dried produce — capturing weight, moisture, and quality at every stage.",
+      "Purpose built for solar dried produce, capturing weight, moisture, and quality at every stage.",
   },
   {
     icon: <BoltIcon className="h-6 w-6" />,
-    title: "Real-time updates",
+    title: "Real time updates",
     description:
       "Operators log progress as it happens, so the record always reflects the true state of the batch.",
   },
@@ -78,8 +78,8 @@ export default function Features() {
             Everything you need to trust a batch
           </h2>
           <p className="mt-4 text-lg text-muted">
-            DryChain pairs on-chain integrity with a simple workflow, so trust
-            is built in — not bolted on.
+            DryChain pairs on chain integrity with a simple workflow, so trust
+            is built in, not bolted on.
           </p>
         </div>
 

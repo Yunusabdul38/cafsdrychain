@@ -1,5 +1,5 @@
 import type { BatchStage } from "@/lib/types";
-import { STAGE_LABEL, STAGE_ORDER } from "@/lib/mock-data";
+import { STAGE_LABEL, STAGE_ORDER } from "@/lib/stages";
 import { cn } from "@/lib/utils";
 import { CheckIcon } from "@/components/icons";
 

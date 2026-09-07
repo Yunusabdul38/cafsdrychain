@@ -1,27 +1,32 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { products } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
-import { Input, Select, Label } from "@/components/ui/Field";
+import { useState, useMemo } from "react";
+import {
+  CATEGORY_NAMES,
+  OTHER_PRODUCT,
+  composeProduct,
+  productsForCategory,
+} from "@/lib/categories";
+import { cn, titleCase, formatDateTime } from "@/lib/utils";
+import { Input, Select } from "@/components/ui/Field";
 import Button, { LinkButton } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/dashboard/PageHeader";
+import ReceiptCard from "@/components/dashboard/ReceiptCard";
 import { useCreateBatch, type ApiBatch } from "@/lib/hooks/useBatches";
 import { useAuthStore } from "@/lib/store/auth";
 import { ApiError } from "@/lib/api";
 import { Spinner } from "@/components/dashboard/States";
-import { DatePicker } from "@/components/ui/DatePicker";
-import { CheckIcon, QrIcon, LinkIcon, DownloadIcon } from "@/components/icons";
+import { CheckIcon, LinkIcon, DownloadIcon } from "@/components/icons";
 
 type Form = {
+  category: string;
   product: string;
+  /** Free-text name used only when `product` is "Other". */
+  otherProduct: string;
   sourceType: string;
   source: string;
-  supplier: string;
   freshWeight: string;
-  deliveryDate: string;
-  facility: string;
 };
 
 const steps = ["Produce details", "Source & delivery", "Review"];
@@ -35,59 +40,66 @@ export default function RegisterWizard() {
   const today = new Date().toISOString().slice(0, 10);
 
   const user = useAuthStore((s) => s.user);
-  const [productSearch, setProductSearch] = useState("");
-  const [isProductOpen, setIsProductOpen] = useState(false);
 
   const [form, setForm] = useState<Form>({
-    product: products[0],
+    category: "",
+    product: "",
+    otherProduct: "",
     sourceType: "Farm",
     source: "",
-    supplier: "",
     freshWeight: "",
-    deliveryDate: today,
-    facility: user?.location || "",
   });
 
   const set = (k: keyof Form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  useEffect(() => {
-    if (user?.location) {
-      set("facility", user.location);
-    }
-  }, [user?.location]);
+  /** The operator's own hub — not an input, so it is read straight from them. */
+  const facility = user?.location ?? "";
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) =>
-      p.toLowerCase().includes(productSearch.toLowerCase())
-    );
-  }, [productSearch]);
+  // The product list is driven by the selected category.
+  const categoryProducts = useMemo(
+    () => productsForCategory(form.category),
+    [form.category]
+  );
 
-  const exactMatch = useMemo(() => {
-    return products.some(
-      (p) => p.toLowerCase() === productSearch.trim().toLowerCase()
-    );
-  }, [productSearch]);
+  const isOtherProduct = form.product === OTHER_PRODUCT;
+
+  // What actually gets stored on the batch: "Mango", or "Other (Awara)".
+  const productValue = composeProduct(form.product, form.otherProduct);
+
+  // Changing category clears the product so a mismatched pair can't be submitted.
+  const onCategoryChange = (value: string) => {
+    setForm((f) => ({ ...f, category: value, product: "", otherProduct: "" }));
+  };
+
+  // Leaving "Other" discards the name that only applied to it.
+  const onProductChange = (value: string) => {
+    setForm((f) => ({
+      ...f,
+      product: value,
+      otherProduct: value === OTHER_PRODUCT ? f.otherProduct : "",
+    }));
+  };
 
   const onRegister = async () => {
     setError(null);
     setFieldErrors({});
 
     const newFieldErrors: Record<string, string[]> = {};
+    if (!form.category) {
+      newFieldErrors.category = ["Category is required."];
+    }
     if (!form.product) {
       newFieldErrors.product = ["Product type is required."];
+    }
+    if (isOtherProduct && !form.otherProduct.trim()) {
+      newFieldErrors.otherProduct = ["Please name the product."];
     }
     if (!form.source.trim()) {
       newFieldErrors.source = ["Source name is required."];
     }
-    if (!form.supplier.trim()) {
-      newFieldErrors.supplier = ["Supplier details are required."];
-    }
     const weightNum = Number(form.freshWeight);
     if (isNaN(weightNum) || weightNum <= 0) {
       newFieldErrors.freshWeight = ["Fresh weight must be a positive number."];
-    }
-    if (!form.deliveryDate) {
-      newFieldErrors.deliveryDate = ["Delivery date is required."];
     }
 
     if (Object.keys(newFieldErrors).length > 0) {
@@ -97,13 +109,12 @@ export default function RegisterWizard() {
 
     try {
       const { batch } = await create.mutateAsync({
-        product: form.product,
+        category: form.category,
+        product: productValue,
         sourceType: form.sourceType as "Farm" | "Market",
         source: form.source,
-        supplier: form.supplier,
         freshWeight: Number(form.freshWeight),
-        deliveryDate: form.deliveryDate,
-        location: form.facility,
+        location: facility,
       });
       setCreated(batch);
     } catch (err) {
@@ -174,9 +185,9 @@ export default function RegisterWizard() {
     ctx.fillText(`${created.freshWeight} kg`, 200, 240);
 
     ctx.font = "bold 16px sans-serif";
-    ctx.fillText("DATE:", 60, 275);
+    ctx.fillText("ENTRY DATE:", 60, 275);
     ctx.font = "16px sans-serif";
-    ctx.fillText(new Date(created.deliveryDate).toLocaleDateString(), 200, 275);
+    ctx.fillText(new Date(created.entryDate).toLocaleDateString(), 200, 275);
 
     // QR Code Image
     const qrImage = new Image();
@@ -202,7 +213,7 @@ export default function RegisterWizard() {
       // Footer
       ctx.font = "12px sans-serif";
       ctx.fillStyle = "#a0aec0";
-      ctx.fillText("Scan QR to verify origin and drying history on Base blockchain.", canvas.width / 2, 665);
+      ctx.fillText("Scan QR to verify origin and drying history on the blockchain.", canvas.width / 2, 665);
 
       // Trigger download
       const link = document.createElement("a");
@@ -214,62 +225,61 @@ export default function RegisterWizard() {
 
   const canNext =
     step === 0
-      ? !!form.product
+      ? !!form.category &&
+        !!form.product &&
+        (!isOtherProduct || !!form.otherProduct.trim())
       : step === 1
-        ? !!form.source && !!form.supplier && !!form.freshWeight
+        ? !!form.source && !!form.freshWeight
         : true;
+
+  // Already settled (fees switched off) means the next step is drying itself.
+  const feeSettled = created?.payment?.status === "PAID";
 
   if (created) {
     return (
-      <>
-        <PageHeader title="Batch registered" />
-        <Card className="mx-auto max-w-md p-8 text-center">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-mint text-brand">
-            <CheckIcon className="h-7 w-7" />
-          </span>
-          <h2 className="mt-4 text-xl font-semibold text-brand-dark">
-            {created.product} registered
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            A unique Batch ID was generated and the record was written to the
-            registry{created.txHash ? " on Base" : ""}.
-          </p>
-
-          <div className="mt-5 rounded-2xl border border-black/[0.08] p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-brand">
-              Batch ID
-            </p>
-            <p className="mt-1 font-mono text-lg font-semibold text-brand-dark">
-              {created.batchId}
-            </p>
-            <div className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-black/[0.08] bg-mint p-6">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/verify/${created.batchId}`)}`}
-                alt={`QR code for ${created.batchId}`}
-                className="h-36 w-36 bg-white p-2 rounded-xl"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-4 w-full"
-                onClick={handleDownloadQr}
-              >
-                <DownloadIcon className="h-4 w-4" /> Download QR Code
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-            <LinkButton href="/operator/drying" full variant="dark">
-              Start drying
-            </LinkButton>
-            <LinkButton href="/operator/batches" full variant="outline">
-              All batches
-            </LinkButton>
-          </div>
-        </Card>
-      </>
+      <ReceiptCard
+        eyebrow="Batch registered"
+        title={titleCase(created.product)}
+        subtitle={`${titleCase(created.category)} · ${titleCase(created.location)}`}
+        rows={[
+          { label: "Batch", value: created.batchId },
+          { label: "Fresh weight", value: `${created.freshWeight} kg` },
+          { label: "Source", value: `${titleCase(created.source)} (${created.sourceType})` },
+          { label: "Entry date", value: formatDateTime(created.entryDate) },
+        ]}
+      >
+        <div className="relative flex flex-col items-center justify-center rounded-2xl border border-black/[0.08] bg-mint p-6">
+          <button
+            type="button"
+            onClick={handleDownloadQr}
+            aria-label="Download QR code"
+            title="Download QR code"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.08] bg-white text-brand transition-colors hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          >
+            <DownloadIcon className="h-4 w-4" />
+          </button>
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(`${window.location.origin}/verify/${created.batchId}`)}`}
+            alt={`QR code for ${created.batchId}`}
+            className="h-40 w-40 rounded-xl bg-white p-2 sm:h-48 sm:w-48"
+          />
+        </div>
+        <p className="mt-4 text-center text-sm leading-relaxed text-muted">
+          Print or share this code. Scanning it shows the batch&apos;s full
+          history.{" "}
+          {feeSettled
+            ? "No drying fee applies, so you can begin drying."
+            : "Next, set the drying fee so drying can begin."}
+        </p>
+        <div className="mt-5 flex flex-col gap-2">
+          <LinkButton href={`/operator/batches/${created.batchId}/update`} full variant="dark">
+            {feeSettled ? "Start drying" : "Set drying fee"}
+          </LinkButton>
+          <LinkButton href="/operator/batches" full variant="outline">
+            All batches
+          </LinkButton>
+        </div>
+      </ReceiptCard>
     );
   }
 
@@ -277,7 +287,7 @@ export default function RegisterWizard() {
     <>
       <PageHeader
         title="Register produce"
-        description="Create a new batch and generate its on-chain record."
+        description="Create a new batch and generate its on chain record."
         back={{ href: "/operator", label: "Overview" }}
       />
 
@@ -320,107 +330,52 @@ export default function RegisterWizard() {
       <Card className="mx-auto max-w-xl p-5 sm:p-7">
         {step === 0 && (
           <div className="space-y-4">
-            <div className="relative">
-              <Label htmlFor="product">Product type</Label>
-              <button
-                id="product"
-                type="button"
-                onClick={() => setIsProductOpen(!isProductOpen)}
-                className={cn(
-                  "flex h-12 w-full items-center justify-between rounded-2xl border bg-white px-4 text-left text-[15px] text-brand-dark outline-none transition-colors placeholder:text-muted/60 focus:border-brand",
-                  fieldErrors.product?.[0] ? "border-red-500" : "border-black/[0.12]"
-                )}
-              >
-                <span>{form.product || "Select product type"}</span>
-                <svg
-                  className={cn(
-                    "h-4 w-4 text-muted transition-transform",
-                    isProductOpen && "rotate-180"
-                  )}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
+            <Select
+              id="category"
+              label="Category"
+              placeholder="Select a category"
+              value={form.category}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              error={fieldErrors.category?.[0]}
+            >
+              {CATEGORY_NAMES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+            <Select
+              id="product"
+              label="Product type"
+              placeholder={
+                form.category ? "Select product type" : "Select a category first"
+              }
+              disabled={!form.category}
+              value={form.product}
+              onChange={(e) => onProductChange(e.target.value)}
+              error={fieldErrors.product?.[0]}
+            >
+              {categoryProducts.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </Select>
 
-              {fieldErrors.product?.[0] && (
-                <p className="mt-1.5 text-xs text-red-600 font-medium leading-relaxed">{fieldErrors.product[0]}</p>
-              )}
+            {/* Naming an "Other" product — recorded as e.g. "Other (Awara)". */}
+            {isOtherProduct && (
+              <Input
+                id="otherProduct"
+                label="Name the product"
+                placeholder="E.g. Ọkà bàbà"
+                value={form.otherProduct}
+                onChange={(e) => set("otherProduct", e.target.value)}
+                required
+                autoFocus
+                error={fieldErrors.otherProduct?.[0]}
+              />
+            )}
 
-              {isProductOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => {
-                      setIsProductOpen(false);
-                      setProductSearch("");
-                    }}
-                  />
-                  <div className="absolute left-0 right-0 z-20 mt-2 max-h-60 overflow-y-auto rounded-2xl border border-black/[0.12] bg-white p-2 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150">
-                    <input
-                      type="text"
-                      className="mb-2 h-10 w-full rounded-xl border border-black/[0.1] bg-black/[0.02] px-3 text-sm outline-none focus:border-brand"
-                      placeholder="Search or add custom..."
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      autoFocus
-                    />
-                    <ul className="space-y-1">
-                      {filteredProducts.map((p) => (
-                        <li key={p}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              set("product", p);
-                              setIsProductOpen(false);
-                              setProductSearch("");
-                            }}
-                            className={cn(
-                              "w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-mint/50",
-                              form.product === p ? "bg-mint text-brand font-medium" : "text-brand-dark"
-                            )}
-                          >
-                            {p}
-                          </button>
-                        </li>
-                      ))}
-                      {productSearch.trim() && !exactMatch && (
-                        <li>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const customValue = productSearch.trim();
-                              set("product", customValue);
-                              setIsProductOpen(false);
-                              setProductSearch("");
-                            }}
-                            className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-brand transition-colors hover:bg-mint/50"
-                          >
-                            + Add custom: "{productSearch.trim()}"
-                          </button>
-                        </li>
-                      )}
-                      {filteredProducts.length === 0 && !productSearch.trim() && (
-                        <li className="px-3 py-2 text-xs text-muted">
-                          No products found.
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                </>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="facility">Drying facility</Label>
-              <div className="flex h-12 w-full items-center rounded-2xl border border-black/[0.12] bg-black/[0.03] px-4 text-[15px] text-brand-dark">
-                {user?.location || "—"}
-              </div>
-            </div>
           </div>
         )}
 
@@ -438,43 +393,31 @@ export default function RegisterWizard() {
             </Select>
             <Input
               id="source"
-              label={form.sourceType === "Farm" ? "Farm name" : "Market name"}
+              label={
+                form.sourceType === "Farm"
+                  ? "Farm name / location"
+                  : "Market name / location"
+              }
               value={form.source}
               onChange={(e) => set("source", e.target.value)}
-              placeholder={form.sourceType === "Farm" ? "Ola Farms" : "Bodija Market"}
+              placeholder={
+                form.sourceType === "Farm"
+                  ? "Adéọlá Farms, Ìwó"
+                  : "Bọ̀dìjà Market, Ìbàdàn"
+              }
               required
               error={fieldErrors.source?.[0]}
             />
             <Input
-              id="supplier"
-              label="Farmer / supplier"
-              value={form.supplier}
-              onChange={(e) => set("supplier", e.target.value)}
-              placeholder="Ibrahim Ola"
+              id="freshWeight"
+              type="number"
+              label="Fresh weight (kg)"
+              value={form.freshWeight}
+              onChange={(e) => set("freshWeight", e.target.value)}
+              placeholder="480"
               required
-              error={fieldErrors.supplier?.[0]}
+              error={fieldErrors.freshWeight?.[0]}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                id="freshWeight"
-                type="number"
-                label="Fresh weight (kg)"
-                value={form.freshWeight}
-                onChange={(e) => set("freshWeight", e.target.value)}
-                placeholder="480"
-                required
-                error={fieldErrors.freshWeight?.[0]}
-              />
-              <DatePicker
-                id="deliveryDate"
-                name="deliveryDate"
-                label="Delivery date"
-                value={form.deliveryDate}
-                onChange={(val) => set("deliveryDate", val)}
-                required
-                error={fieldErrors.deliveryDate?.[0]}
-              />
-            </div>
           </div>
         )}
 
@@ -482,12 +425,12 @@ export default function RegisterWizard() {
           <div>
             <dl className="divide-y divide-black/[0.06] overflow-hidden rounded-2xl border border-black/[0.08]">
               {[
-                ["Product", form.product],
-                ["Facility", form.facility],
+                ["Category", form.category],
+                ["Product", productValue],
+                ["Facility", titleCase(facility)],
                 ["Source", `${form.source} (${form.sourceType})`],
-                ["Supplier", form.supplier],
                 ["Fresh weight", `${form.freshWeight} kg`],
-                ["Delivery date", form.deliveryDate],
+                ["Entry date", `${today} (recorded on registration)`],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4 px-4 py-3 text-sm">
                   <dt className="text-muted">{k}</dt>
@@ -497,7 +440,7 @@ export default function RegisterWizard() {
             </dl>
             <div className="mt-4 flex items-center gap-2 rounded-2xl border border-black/[0.08] bg-mint/40 px-4 py-3 text-sm text-brand-dark">
               <LinkIcon className="h-5 w-5 shrink-0 text-brand" />
-              A Batch ID + QR code will be generated and recorded on-chain.
+              A Batch ID + QR code will be generated and recorded on chain.
             </div>
             {error && (
               <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">

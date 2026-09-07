@@ -1,7 +1,8 @@
 import type { Role } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { hashPassword, generateTempPassword } from '../lib/password.js';
-import { sendInviteEmail } from '../lib/email.js';
+import crypto from 'node:crypto';
+import { hashPassword } from '../lib/password.js';
+import { issueInvite } from './authService.js';
 import { logger } from '../lib/logger.js';
 import { createWalletForUser } from './walletService.js';
 import { grantOperatorRoles } from '../chain/relayer.js';
@@ -15,7 +16,6 @@ const publicUser = {
   role: true,
   status: true,
   location: true,
-  mustChangePassword: true,
   createdAt: true,
   wallet: { select: { address: true, index: true, chain: true, derivationPath: true } },
 } as const;
@@ -26,10 +26,46 @@ const publicUser = {
  */
 export async function createUser(input: CreateUserInput) {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
-  if (existing) throw new AppError(409, 'A user with this email already exists');
+  if (existing) {
+    // One account per email, and one role per account. Say which account is in
+    // the way and what to do about it, rather than a bare "already exists".
+    const article = (role: string) => (role === 'ADMIN' ? 'an administrator' : 'an operator');
+    const state =
+      existing.status === 'PENDING'
+        ? ' Their invitation has not been accepted yet, so you can resend it instead.'
+        : existing.status === 'INACTIVE'
+          ? ' That account is deactivated. Reactivate it rather than creating a second one.'
+          : '';
+    const roleClash =
+      existing.role !== input.role
+        ? ` A person can hold one role only, so delete that account first if they should be ${article(
+            input.role
+          )} instead.`
+        : '';
 
-  const tempPassword = generateTempPassword();
-  const passwordHash = await hashPassword(tempPassword);
+    throw new AppError(
+      409,
+      `${existing.name} already has ${article(existing.role)} account using ${
+        input.email
+      }.${state}${roleClash}`,
+      'USER_EXISTS',
+      // Enough for the client to offer the right next step rather than a dead end.
+      {
+        existing: {
+          id: existing.id,
+          name: existing.name,
+          email: existing.email,
+          role: existing.role,
+          status: existing.status,
+        },
+      }
+    );
+  }
+
+  // No password is ever chosen for them. The account is parked with an
+  // unguessable hash nobody holds, and stays PENDING until they set their own
+  // through the invitation link, so no secret travels by email.
+  const passwordHash = await hashPassword(crypto.randomBytes(32).toString('hex'));
 
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
@@ -39,7 +75,7 @@ export async function createUser(input: CreateUserInput) {
         role: input.role as Role,
         location: input.location,
         passwordHash,
-        mustChangePassword: true,
+        status: 'PENDING',
       },
     });
     // Deterministic wallet derivation, atomic with the user record.
@@ -53,7 +89,9 @@ export async function createUser(input: CreateUserInput) {
   });
 
   // Best-effort side effects (must not roll back the DB record).
-  void sendInviteEmail(input.email, input.name, tempPassword, input.role);
+  void issueInvite(user.id).catch((err) =>
+    logger.error({ err, email: input.email }, 'Failed to send the invitation email')
+  );
   if (input.role === 'OPERATOR' && withWallet?.wallet) {
     // Authorise the operator's EOA on-chain so its signatures are accepted.
     grantOperatorRoles(withWallet.wallet.address)
@@ -61,8 +99,7 @@ export async function createUser(input: CreateUserInput) {
       .catch((err) => logger.error({ err }, 'failed to grant operator roles on-chain'));
   }
 
-  // The temp password is returned once so the admin can relay it if email is off.
-  return { user: withWallet, tempPassword };
+  return { user: withWallet };
 }
 
 export function listUsers() {
@@ -82,7 +119,18 @@ export async function updateUserStatus(id: string, status: 'ACTIVE' | 'INACTIVE'
     data: { status },
     select: publicUser
   });
-  
+
+  // Deactivating must take effect at once, not whenever their token happens to
+  // lapse. Revoking the sessions stops any refresh, and the client's heartbeat
+  // signs them out within seconds.
+  if (status === 'INACTIVE') {
+    const { count } = await prisma.refreshToken.updateMany({
+      where: { userId: id, revoked: false },
+      data: { revoked: true },
+    });
+    logger.info({ userId: id, sessionsEnded: count }, 'Account deactivated — sessions revoked');
+  }
+
   return updated;
 }
 
@@ -90,7 +138,6 @@ export async function deleteUser(id: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
 
-  // Check if the user has any associated batches as operator
   const batchCount = await prisma.batch.count({ where: { operatorId: id } });
 
   if (batchCount > 0) {

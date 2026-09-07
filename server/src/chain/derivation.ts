@@ -57,9 +57,4 @@ export function isDerivationConfigured(): boolean {
   return Boolean(env.MASTER_XPUB || env.MASTER_MNEMONIC);
 }
 
-/** Can this instance sign (i.e. is it holding the seed)? */
-export function canSign(): boolean {
-  return Boolean(env.MASTER_MNEMONIC);
-}
-
 export { accountPath };

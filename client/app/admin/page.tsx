@@ -1,5 +1,6 @@
 "use client";
 
+import { titleCase } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
@@ -7,7 +8,6 @@ import { StatGrid } from "@/components/dashboard/StatCard";
 import { Card, CardHeader } from "@/components/ui/Card";
 import BarList from "@/components/dashboard/BarList";
 import ActivityFeed from "@/components/dashboard/ActivityFeed";
-import { LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { LoadingState, ErrorState } from "@/components/dashboard/States";
 import { useBatches } from "@/lib/hooks/useBatches";
@@ -15,8 +15,7 @@ import { useUsers } from "@/lib/hooks/useUsers";
 import { toUiBatches } from "@/lib/adapters";
 import { adminMetrics, recentActivity } from "@/lib/metrics";
 import { deriveLocations } from "@/lib/locations";
-import { STAGE_LABEL, STAGE_ORDER } from "@/lib/mock-data";
-import { DownloadIcon } from "@/components/icons";
+import { STAGE_LABEL, STAGE_ORDER } from "@/lib/stages";
 
 export default function AdminOverview() {
   const batchesQ = useBatches();
@@ -41,12 +40,7 @@ export default function AdminOverview() {
     <>
       <PageHeader
         title="Monitoring"
-        description="Oversee every batch, hub, and on-chain record."
-        action={
-          <LinkButton href="/admin/reports" variant="outline">
-            <DownloadIcon className="h-5 w-5" /> Reports
-          </LinkButton>
-        }
+        description="Oversee every batch, hub, and on chain record."
       />
 
       {isLoading ? (
@@ -92,7 +86,7 @@ export default function AdminOverview() {
                   {locations.map((loc) => (
                     <li key={loc.name} className="flex items-center justify-between px-5 py-4">
                       <div>
-                        <p className="font-medium text-brand-dark">{loc.name}</p>
+                        <p className="font-medium text-brand-dark">{titleCase(loc.name)}</p>
                         <p className="text-xs text-muted">
                           {loc.batches} batches · {loc.active} drying now
                         </p>
@@ -112,7 +106,7 @@ export default function AdminOverview() {
           <div className="mt-6">
             <Card>
               <CardHeader
-                title="Recent on-chain activity"
+                title="Recent on chain activity"
                 action={
                   <Link href="/admin/blockchain" className="text-xs font-semibold text-brand hover:underline">
                     View ledger

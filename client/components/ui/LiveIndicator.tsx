@@ -15,17 +15,18 @@ export function LiveIndicator({
   dataUpdatedAt?: number;
   className?: string;
 }) {
-  const [, forceRender] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
 
-  // Re-render every 10 seconds to keep the "X seconds ago" label fresh.
+  // Tick every 10 seconds so the "X seconds ago" label stays fresh. The clock is
+  // captured into state rather than read during render, which must stay pure.
   useEffect(() => {
-    const id = setInterval(() => forceRender((n) => n + 1), 10_000);
+    const id = setInterval(() => setNow(Date.now()), 10_000);
     return () => clearInterval(id);
   }, []);
 
   if (!dataUpdatedAt) return null;
 
-  const secondsAgo = Math.floor((Date.now() - dataUpdatedAt) / 1000);
+  const secondsAgo = Math.floor((now - dataUpdatedAt) / 1000);
   const label =
     secondsAgo < 5
       ? "just now"

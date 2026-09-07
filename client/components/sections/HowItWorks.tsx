@@ -21,18 +21,17 @@ const steps: Step[] = [
     description:
       "An authorized operator registers each batch delivered to the solar dryer. The system mints a unique Batch ID, generates a QR code, and writes a secure blockchain record.",
     points: [
-      "Product type",
+      "Category & product type",
       "Source (farm or market)",
-      "Farmer / supplier info",
       "Fresh weight",
-      "Date of delivery",
+      "Entry date",
     ],
   },
   {
     icon: <SunIcon className="h-6 w-6" />,
     title: "Drying Process",
     description:
-      "As drying progresses, the operator updates the batch. Every update is recorded on-chain, building a transparent, tamper-resistant history of the process.",
+      "As drying progresses, the operator updates the batch. Every update is recorded on chain, building a transparent, tamper resistant history of the process.",
     points: [
       "Drying start & completion time",
       "Final weight",
@@ -44,10 +43,9 @@ const steps: Step[] = [
     icon: <BoxIcon className="h-6 w-6" />,
     title: "Storage & Distribution",
     description:
-      "Once drying completes, the system captures how and where the product moves — making every step traceable from production to delivery.",
+      "Once drying completes, the system captures how and where the product moves, making every step traceable from production to delivery.",
     points: [
       "Storage location",
-      "Packaging details",
       "Transportation information",
       "Destination or buyer",
     ],
@@ -94,7 +92,7 @@ export default function HowItWorks() {
           </h2>
           <p className="mt-4 text-lg text-muted">
             Five simple steps take a batch from the dryer to a verified,
-            on-chain record anyone can trust.
+            on chain record anyone can trust.
           </p>
         </div>
 

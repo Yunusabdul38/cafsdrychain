@@ -1,3 +1,4 @@
+import DetailRow from "@/components/ui/DetailRow";
 import Link from "next/link";
 import type { Batch } from "@/lib/types";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -5,21 +6,10 @@ import { StageBadge, VerifiedBadge } from "@/components/ui/Badge";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StageProgress from "@/components/dashboard/StageProgress";
 import Timeline from "@/components/dashboard/Timeline";
-import Button, { LinkButton } from "@/components/ui/Button";
+import { LinkButton, buttonClass } from "@/components/ui/Button";
 import { nextAction } from "@/lib/lifecycle";
-import { formatDate, formatDateTime } from "@/lib/utils";
-import { ArrowRightIcon, QrIcon, DownloadIcon } from "@/components/icons";
-
-function Row({ label, value }: { label: string; value?: string | number }) {
-  return (
-    <div className="flex items-start justify-between gap-4 px-5 py-3 text-sm">
-      <dt className="shrink-0 text-muted">{label}</dt>
-      <dd className="text-right font-medium text-brand-dark">
-        {value ?? "—"}
-      </dd>
-    </div>
-  );
-}
+import { formatDate, formatDateTime, titleCase } from "@/lib/utils";
+import { ArrowRightIcon, DownloadIcon } from "@/components/icons";
 
 export default function BatchDetail({
   batch,
@@ -85,9 +75,9 @@ export default function BatchDetail({
     ctx.fillText(`${batch.freshWeight} kg`, 200, 240);
 
     ctx.font = "bold 16px sans-serif";
-    ctx.fillText("DATE:", 60, 275);
+    ctx.fillText("ENTRY DATE:", 60, 275);
     ctx.font = "16px sans-serif";
-    ctx.fillText(formatDate(batch.deliveryDate), 200, 275);
+    ctx.fillText(formatDate(batch.entryDate), 200, 275);
 
     // QR Code Image
     const qrImage = new Image();
@@ -113,7 +103,7 @@ export default function BatchDetail({
       // Footer
       ctx.font = "12px sans-serif";
       ctx.fillStyle = "#a0aec0";
-      ctx.fillText("Scan QR to verify origin and drying history on Base blockchain.", canvas.width / 2, 665);
+      ctx.fillText("Scan QR to verify origin and drying history on the blockchain.", canvas.width / 2, 665);
 
       // Trigger download
       const link = document.createElement("a");
@@ -126,7 +116,7 @@ export default function BatchDetail({
   return (
     <>
       <PageHeader
-        title={batch.product}
+        title={titleCase(batch.product)}
         back={{ href: basePath, label: "Batches" }}
         action={
           canAct && action ? (
@@ -138,8 +128,7 @@ export default function BatchDetail({
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
-        <span className="font-mono text-sm text-muted">{batch.id}</span>
-        <StageBadge stage={batch.stage} />
+        <StageBadge stage={batch.stage} paid={batch.payment?.status === "PAID"} />
         {batch.verified && <VerifiedBadge />}
       </div>
 
@@ -153,46 +142,45 @@ export default function BatchDetail({
           <Card>
             <CardHeader title="Produce" />
             <dl className="divide-y divide-black/[0.06]">
-              <Row label="Product" value={batch.product} />
-              <Row label="Source" value={`${batch.source} (${batch.sourceType})`} />
-              <Row label="Supplier" value={batch.supplier} />
-              <Row label="Fresh weight" value={`${batch.freshWeight} kg`} />
-              <Row label="Delivery date" value={formatDate(batch.deliveryDate)} />
-              <Row label="Facility" value={batch.location} />
-              <Row label="Operator" value={batch.operator} />
+              <DetailRow label="Category" value={batch.category} />
+              <DetailRow label="Product" value={titleCase(batch.product)} />
+              <DetailRow label="Source" value={`${titleCase(batch.source)} (${batch.sourceType})`} />
+              <DetailRow label="Fresh weight" value={`${batch.freshWeight} kg`} />
+              <DetailRow label="Entry date" value={formatDate(batch.entryDate)} />
+              <DetailRow label="Facility" value={titleCase(batch.location)} />
+              <DetailRow label="Operator" value={titleCase(batch.operator)} />
             </dl>
           </Card>
 
           <Card>
             <CardHeader title="Drying record" />
             <dl className="divide-y divide-black/[0.06]">
-              <Row
+              <DetailRow
                 label="Started"
                 value={batch.dryingStart ? formatDateTime(batch.dryingStart) : undefined}
               />
-              <Row
+              <DetailRow
                 label="Completed"
                 value={batch.dryingEnd ? formatDateTime(batch.dryingEnd) : undefined}
               />
-              <Row
+              <DetailRow
                 label="Final weight"
                 value={batch.finalWeight ? `${batch.finalWeight} kg` : undefined}
               />
-              <Row
+              <DetailRow
                 label="Moisture"
                 value={batch.moisture !== undefined ? `${batch.moisture}%` : undefined}
               />
-              <Row label="Quality" value={batch.quality} />
+              <DetailRow label="Drying method" value={titleCase(batch.dryingMethod)} />
+              <DetailRow label="Quality" value={titleCase(batch.quality)} />
             </dl>
           </Card>
 
           <Card>
             <CardHeader title="Storage & distribution" />
             <dl className="divide-y divide-black/[0.06]">
-              <Row label="Storage location" value={batch.storageLocation} />
-              <Row label="Packaging" value={batch.packaging} />
-              <Row label="Transport" value={batch.transport} />
-              <Row label="Destination" value={batch.destination} />
+              <DetailRow label="Storage location" value={titleCase(batch.storageLocation)} />
+              <DetailRow label="Destination" value={titleCase(batch.destination)} />
             </dl>
           </Card>
         </div>
@@ -200,37 +188,31 @@ export default function BatchDetail({
         <div className="space-y-6">
           {/* QR / verification */}
           <Card className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand">
-                  Public verification
-                </p>
-                <p className="mt-1 font-mono text-sm text-brand-dark">
-                  {batch.id}
-                </p>
+            {batch.verified && (
+              <div className="flex justify-end">
+                <VerifiedBadge />
               </div>
-              <VerifiedBadge />
-            </div>
-            <div className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-black/[0.08] bg-mint p-6">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(`${window.location.origin}/verify/${batch.id}`)}`}
-                alt={`QR code for ${batch.id}`}
-                className="h-36 w-36 bg-white p-2 rounded-xl"
-              />
-              <Button
+            )}
+            <div className="relative mt-4 flex flex-col items-center justify-center rounded-2xl border border-black/[0.08] bg-mint p-6">
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="mt-4 w-full"
                 onClick={handleDownloadQr}
+                aria-label="Download QR code"
+                title="Download QR code"
+                className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.08] bg-white text-brand transition-colors hover:bg-brand hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
               >
-                <DownloadIcon className="h-4 w-4" /> Download QR Code
-              </Button>
+                <DownloadIcon className="h-4 w-4" />
+              </button>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(`${window.location.origin}/verify/${batch.id}`)}`}
+                alt={`QR code for ${batch.id}`}
+                className="h-40 w-40 rounded-xl bg-white p-2 sm:h-48 sm:w-48"
+              />
             </div>
             <Link
               href={`/verify/${batch.id}`}
               target="_blank"
-              className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-black/[0.12] text-sm font-semibold text-brand-dark transition-colors hover:bg-mint"
+              className={buttonClass({ variant: "outline", full: true, className: "mt-4" })}
             >
               Open public record <ArrowRightIcon className="h-4 w-4" />
             </Link>
@@ -238,7 +220,7 @@ export default function BatchDetail({
 
           {/* Timeline */}
           <Card>
-            <CardHeader title="On-chain timeline" />
+            <CardHeader title="On chain timeline" />
             <div className="p-5">
               <Timeline events={batch.timeline} />
             </div>

@@ -13,7 +13,7 @@ import Button from "@/components/ui/Button";
 import { LoadingState, Spinner } from "@/components/dashboard/States";
 import { LogoutIcon, CheckIcon } from "@/components/icons";
 
-export default function SettingsView() {
+export default function SettingsView({ children }: { children?: React.ReactNode }) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const changePassword = useChangePassword();
@@ -90,7 +90,9 @@ export default function SettingsView() {
             {title}
           </span>
           {user.location && <p className="mt-3 text-sm text-muted">{user.location}</p>}
-          {user.wallet && (
+          {/* Admins see the gas wallet card instead — two wallet addresses on one
+              page reads as a contradiction rather than two distinct things. */}
+          {user.wallet && user.role !== "admin" && (
             <div className="mt-4 rounded-2xl border border-black/[0.08] bg-mint/40 p-3 text-left">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-brand">
                 Wallet
@@ -189,6 +191,7 @@ export default function SettingsView() {
           </Card>
         </div>
       </div>
+      {children && <div className="mt-6">{children}</div>}
     </>
   );
 }

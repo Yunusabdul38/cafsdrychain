@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, ReactNode } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "./Field";
 
@@ -40,6 +40,20 @@ function parseDate(val?: string): Date {
   return isNaN(d.getTime()) ? new Date() : d;
 }
 
+/** Midnight today — the earliest selectable day unless past dates are allowed. */
+function startOfToday() {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
 export function DatePicker({
   id,
   name,
@@ -49,6 +63,7 @@ export function DatePicker({
   error,
   required,
   className,
+  allowPast = false,
 }: {
   id?: string;
   name?: string;
@@ -58,6 +73,8 @@ export function DatePicker({
   error?: string;
   required?: boolean;
   className?: string;
+  /** Past days are blocked by default; opt in only where history is expected. */
+  allowPast?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -180,17 +197,22 @@ export function DatePicker({
               const isSelected = selectedDate && formatDateString(dItem.date) === formatDateString(selectedDate);
               const isToday = formatDateString(dItem.date) === formatDateString(new Date());
 
+              const isPast = !allowPast && dItem.date < startOfToday();
+
               return (
                 <button
                   key={idx}
                   type="button"
+                  disabled={isPast}
+                  aria-disabled={isPast}
                   onClick={() => handleSelectDay(dItem.date)}
                   className={cn(
                     "h-8 w-8 rounded-full flex items-center justify-center font-medium transition-colors focus:outline-none",
                     !dItem.currentMonth && "text-muted/40",
-                    dItem.currentMonth && !isSelected && "text-brand-dark hover:bg-mint/45",
+                    dItem.currentMonth && !isSelected && !isPast && "text-brand-dark hover:bg-mint/45",
+                    isPast && "cursor-not-allowed text-muted/25 line-through",
                     isSelected && "bg-brand text-white",
-                    isToday && !isSelected && "border border-brand text-brand"
+                    isToday && !isSelected && !isPast && "border border-brand text-brand"
                   )}
                 >
                   {dItem.day}
@@ -216,6 +238,8 @@ export function DateTimePicker({
   error,
   required,
   className,
+  allowPast = false,
+  min,
 }: {
   id?: string;
   name?: string;
@@ -226,19 +250,41 @@ export function DateTimePicker({
   error?: string;
   required?: boolean;
   className?: string;
+  /** Past dates and times are blocked by default. */
+  allowPast?: boolean;
+  /** An explicit earliest selectable moment, e.g. the drying start time. */
+  min?: string | Date | null;
 }) {
-  const [val, setVal] = useState(controlledValue ?? defaultValue);
+  // A controlled value wins outright; local state only backs the uncontrolled
+  // case. Deriving it avoids copying the prop into state from an effect.
+  const [uncontrolledVal, setVal] = useState(defaultValue);
+  const val = controlledValue ?? uncontrolledVal;
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedDate = parseDate(val);
   const [viewDate, setViewDate] = useState(() => new Date(selectedDate));
 
-  useEffect(() => {
-    if (controlledValue !== undefined) {
-      setVal(controlledValue);
-    }
-  }, [controlledValue]);
+  // Snapshot "now" once per mount rather than reading the clock during render,
+  // which keeps this component pure and its bounds stable while it is open.
+  const [mountedAt] = useState(() => Date.now());
+
+  // The earliest selectable moment: the later of "now" and any explicit min.
+  const bounds: number[] = [];
+  if (!allowPast) bounds.push(mountedAt);
+  if (min) {
+    const m = new Date(min).getTime();
+    if (!Number.isNaN(m)) bounds.push(m);
+  }
+  const minMoment = bounds.length ? new Date(Math.max(...bounds)) : null;
+
+  const onMinDay = minMoment != null && isSameDay(selectedDate, minMoment);
+  const minHour = onMinDay ? minMoment!.getHours() : 0;
+  const minMinute =
+    onMinDay && selectedDate.getHours() === minMoment!.getHours()
+      ? minMoment!.getMinutes()
+      : 0;
+
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -303,7 +349,14 @@ export function DateTimePicker({
     const newD = new Date(d);
     newD.setHours(hour);
     newD.setMinutes(min);
-    
+
+    // Jumping back to the earliest allowed day with a time that precedes the
+    // bound would sneak an invalid value in through the calendar — lift it.
+    if (minMoment && newD < minMoment) {
+      newD.setHours(minMoment.getHours());
+      newD.setMinutes(minMoment.getMinutes());
+    }
+
     const str = formatDateTimeString(newD);
     setVal(str);
     onChange?.(str);
@@ -379,17 +432,29 @@ export function DateTimePicker({
               const isSelected = selectedDate && formatDateString(dItem.date) === formatDateString(selectedDate);
               const isToday = formatDateString(dItem.date) === formatDateString(new Date());
 
+              const isPast =
+                minMoment != null &&
+                dItem.date <
+                  new Date(
+                    minMoment.getFullYear(),
+                    minMoment.getMonth(),
+                    minMoment.getDate()
+                  );
+
               return (
                 <button
                   key={idx}
                   type="button"
+                  disabled={isPast}
+                  aria-disabled={isPast}
                   onClick={() => handleSelectDay(dItem.date)}
                   className={cn(
                     "h-8 w-8 rounded-full flex items-center justify-center font-medium transition-colors focus:outline-none",
                     !dItem.currentMonth && "text-muted/40",
-                    dItem.currentMonth && !isSelected && "text-brand-dark hover:bg-mint/45",
+                    dItem.currentMonth && !isSelected && !isPast && "text-brand-dark hover:bg-mint/45",
+                    isPast && "cursor-not-allowed text-muted/25 line-through",
                     isSelected && "bg-brand text-white",
-                    isToday && !isSelected && "border border-brand text-brand"
+                    isToday && !isSelected && !isPast && "border border-brand text-brand"
                   )}
                 >
                   {dItem.day}
@@ -409,7 +474,7 @@ export function DateTimePicker({
                 className="rounded-lg border border-black/[0.12] bg-white px-2 py-1 outline-none text-brand-dark font-medium"
               >
                 {Array.from({ length: 24 }).map((_, i) => (
-                  <option key={i} value={i}>
+                  <option key={i} value={i} disabled={i < minHour}>
                     {String(i).padStart(2, "0")}
                   </option>
                 ))}
@@ -422,7 +487,7 @@ export function DateTimePicker({
                 className="rounded-lg border border-black/[0.12] bg-white px-2 py-1 outline-none text-brand-dark font-medium"
               >
                 {Array.from({ length: 60 }).map((_, i) => (
-                  <option key={i} value={i}>
+                  <option key={i} value={i} disabled={i < minMinute}>
                     {String(i).padStart(2, "0")}
                   </option>
                 ))}

@@ -13,17 +13,26 @@ enum Role {
 }
 
 enum UserStatus {
+  /// Invited, but has not chosen a password yet — cannot sign in.
+  PENDING
   ACTIVE
   INACTIVE
 }
 
 enum BatchStage {
   REGISTERED
+  AWAITING_PAYMENT
   DRYING
   DRIED
   STORED
   IN_TRANSIT
   DELIVERED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
 }
 
 enum ChainStatus {
@@ -40,6 +49,8 @@ model User {
   status             UserStatus     @default(ACTIVE)
   location           String?
   passwordHash       String
+  /// Unused. Never enforced, and invited users choose their own password.
+  /// Drop in the cleanup migration alongside `supplier` and `transport`.
   mustChangePassword Boolean        @default(true)
   wallet             Wallet?
   batches            Batch[]              @relation("BatchOperator")
@@ -49,9 +60,18 @@ model User {
   updatedAt          DateTime             @updatedAt
 }
 
-/// Hashed, single-use password-reset tokens.
+enum TokenPurpose {
+  /// Sent to a new user so they can choose their first password.
+  INVITE
+  /// Sent to an existing user who forgot theirs.
+  RESET
+}
+
+/// Hashed, single-use tokens for setting a password. One model covers both the
+/// first-time invitation and a later reset; only the lifetime and wording differ.
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String       @id @default(uuid())
+  purpose   TokenPurpose @default(RESET)
   tokenHash String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
@@ -83,16 +103,25 @@ model WalletCounter {
 model Batch {
   id              String       @id @default(uuid())
   batchId         String       @unique // human id e.g. DRY-2K7F-9X1
+  /// Produce category (Fruit, Vegetable, Crop, Livestock, …). Defaulted so the
+  /// column could be added to databases that already held batches.
+  category        String       @default("Uncategorized")
   product         String
   sourceType      String
   source          String
-  supplier        String
+  /// No longer collected at registration; nullable so existing rows keep their
+  /// value. Drop in a cleanup migration alongside `transport`.
+  supplier        String?
   freshWeight     Float
   finalWeight     Float?
   moisture        Float?
-  deliveryDate    DateTime
+  /// When the operator confirmed registration. Kept on the original column
+  /// name so the rename needs no migration.
+  entryDate       DateTime     @map("deliveryDate")
   dryingStart     DateTime?
   dryingEnd       DateTime?
+  /// How the batch was dried (solar tunnel, cabinet, hybrid…).
+  dryingMethod    String?
   quality         String?
   storageLocation String?
   packaging       String?
@@ -106,6 +135,7 @@ model Batch {
   operator        User         @relation("BatchOperator", fields: [operatorId], references: [id])
   operatorId      String
   events          BatchEvent[]
+  payment         Payment?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -117,10 +147,32 @@ model BatchEvent {
   stage        BatchStage
   title        String
   actor        String
+  /// Free-text comment the operator left when recording this step.
+  note         String?
   metadataHash String
   txHash       String?
   chainStatus  ChainStatus @default(PENDING)
   createdAt    DateTime    @default(now())
+}
+
+/// The drying fee for one batch. Drying cannot start until this is PAID.
+/// `amount` is held in kobo (NGN minor units) as an integer — money is never
+/// stored as a float.
+model Payment {
+  id          String        @id @default(uuid())
+  batch       Batch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId     String        @unique
+  amount      Int
+  currency    String        @default("NGN")
+  /// Which gateway issued the link ("stub" until a real provider is wired up).
+  provider    String
+  /// Provider-side idempotency key; what webhooks are matched on.
+  reference   String        @unique
+  checkoutUrl String
+  status      PaymentStatus @default(PENDING)
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 /// Hashed, rotating refresh tokens for session management.
@@ -131,6 +183,9 @@ model RefreshToken {
   userId    String
   expiresAt DateTime
   revoked   Boolean  @default(false)
+  /// Last time this session was exchanged. Sessions idle beyond the configured
+  /// window are refused even though the token has not formally expired.
+  lastUsedAt DateTime @default(now())
   createdAt DateTime @default(now())
 }
 
@@ -139,6 +194,15 @@ model Location {
   id        String   @id @default(uuid())
   name      String   @unique
   createdAt DateTime @default(now())
+}
+
+/// Single-row admin configuration. Drying fees are collected unless the admin
+/// turns them off; `minimumFee` is the floor an operator may charge, in kobo.
+model AppSettings {
+  id          Int      @id @default(1)
+  feesEnabled Boolean  @default(true)
+  minimumFee  Int      @default(0)
+  updatedAt   DateTime @updatedAt
 }
 
 /// Security / compliance audit trail of sensitive actions.

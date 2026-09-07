@@ -7,7 +7,9 @@ export class AppError extends Error {
   constructor(
     public status: number,
     message: string,
-    public code?: string
+    public code?: string,
+    /** Structured context a client can act on, e.g. the conflicting record. */
+    public details?: unknown
   ) {
     super(message);
   }
@@ -32,7 +34,9 @@ export const errorHandler = (
   }
 
   if (err instanceof AppError) {
-    return res.status(err.status).json({ error: err.message, code: err.code });
+    return res
+      .status(err.status)
+      .json({ error: err.message, code: err.code, details: err.details });
   }
 
   logger.error({ err }, 'Unhandled error');

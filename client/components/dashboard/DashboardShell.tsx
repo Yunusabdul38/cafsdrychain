@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/types";
 import { navByRole, roleMeta, type NavItem } from "@/lib/nav";
 import { useAuthStore } from "@/lib/store/auth";
+import { useIdleLogout } from "@/lib/hooks/useIdleLogout";
+import { useSessionWatch } from "@/lib/hooks/useSessionWatch";
+import IdleWarning from "@/components/dashboard/IdleWarning";
 import { useLogout } from "@/lib/hooks/useAuth";
 import Logo from "@/components/ui/Logo";
 import { LoadingState } from "@/components/dashboard/States";
@@ -24,17 +27,18 @@ export default function DashboardShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, status } = useAuthStore();
+  const { warning, staySignedIn } = useIdleLogout();
+  useSessionWatch();
   const logout = useLogout();
   const nav = navByRole[role];
   const meta = roleMeta[role];
 
-  // Collapsed by default; restore user preference from localStorage
-  const [collapsed, setCollapsed] = useState(true);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    if (saved === "false") setCollapsed(false);
-  }, []);
+  // Collapsed by default, restoring the saved preference on first render.
+  // localStorage is unavailable during SSR, hence the guard.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "false";
+  });
 
   const toggleSidebar = () => {
     setCollapsed((c) => {
@@ -47,7 +51,8 @@ export default function DashboardShell({
   // Auth + role guard.
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace(`/login`);
+      const reason = useAuthStore.getState().signOutReason;
+      router.replace(reason ? `/login?reason=${reason}` : "/login");
     } else if (status === "authenticated" && user && user.role !== role) {
       router.replace(user.role === "admin" ? "/admin" : "/operator");
     }
@@ -73,6 +78,8 @@ export default function DashboardShell({
 
   return (
     <div className="min-h-screen bg-[#f6f8f4]">
+      {warning && <IdleWarning onStay={staySignedIn} />}
+
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -87,7 +94,7 @@ export default function DashboardShell({
             collapsed ? "justify-center px-2" : "justify-between px-4"
           )}
         >
-          {!collapsed && <Logo href={meta.home} />}
+          {!collapsed && <Logo href="/" />}
           <button
             type="button"
             onClick={toggleSidebar}
@@ -172,7 +179,7 @@ export default function DashboardShell({
       >
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-black/[0.08] bg-white px-4 sm:px-6">
           <div className="lg:hidden">
-            <Logo href={meta.home} />
+            <Logo href="/" />
           </div>
           <div className="hidden lg:block">
             <p className="text-sm text-muted">

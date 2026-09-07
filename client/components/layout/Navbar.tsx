@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { useAuthStore } from "@/lib/store/auth";
+
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CloseIcon, MenuIcon } from "@/components/icons";
 
 const links = [
@@ -11,15 +14,11 @@ const links = [
 ];
 
 export default function Navbar() {
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
+  const { user, status } = useAuthStore();
+  const signedIn = status === "authenticated" && Boolean(user);
+  const home = user?.role === "admin" ? "/admin" : "/operator";
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  const [open, setOpen] = useState(false);
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6">
@@ -62,17 +61,17 @@ export default function Navbar() {
 
         {/* Desktop actions */}
         <div className="hidden items-center gap-2 md:flex">
-          <a
+          <Link
             href="/verify"
             className="rounded-full bg-brand px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-hover"
           >
             Verify a Batch
-          </a>
+          </Link>
           <a
-            href="/login"
+            href={signedIn ? home : "/login"}
             className="rounded-full bg-brand-dark px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-darker"
           >
-            Login
+            {signedIn ? "Dashboard" : "Login"}
           </a>
         </div>
 
@@ -105,19 +104,19 @@ export default function Navbar() {
             ))}
           </ul>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <a
+            <Link
               href="/verify"
               onClick={() => setOpen(false)}
               className="rounded-full bg-brand px-6 py-3 text-center text-sm font-semibold text-white"
             >
               Verify
-            </a>
+            </Link>
             <a
-              href="/login"
+              href={signedIn ? home : "/login"}
               onClick={() => setOpen(false)}
               className="rounded-full bg-brand-dark px-6 py-3 text-center text-sm font-semibold text-white"
             >
-              Login
+              {signedIn ? "Dashboard" : "Login"}
             </a>
           </div>
         </div>

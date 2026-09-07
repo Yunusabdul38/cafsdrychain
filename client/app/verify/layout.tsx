@@ -9,7 +9,7 @@ export default function VerifyLayout({
   return (
     <div className="flex min-h-screen flex-col bg-[#f6f8f4]">
       <header className="border-b border-black/[0.08] bg-white">
-        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Logo />
           <nav className="flex items-center gap-2">
             <Link
@@ -28,13 +28,13 @@ export default function VerifyLayout({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         {children}
       </main>
 
       <footer className="border-t border-black/[0.08] bg-white">
-        <div className="mx-auto max-w-4xl px-4 py-6 text-center text-sm text-muted sm:px-6">
-          © {new Date().getFullYear()} CAFS DryChain · Secured on Base
+        <div className="mx-auto max-w-6xl px-4 py-6 text-center text-sm text-muted sm:px-6">
+          © {new Date().getFullYear()} CAFS DryChain · Secured on chain
         </div>
       </footer>
     </div>

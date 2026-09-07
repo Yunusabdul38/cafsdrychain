@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import type { ZodTypeAny, z } from 'zod';
+import type { ZodTypeAny } from 'zod';
 
 /**
  * Validates and *replaces* req.body/query/params with the parsed, typed result,
@@ -21,5 +21,3 @@ export function validate<B extends ZodTypeAny>(schema: {
     }
   };
 }
-
-export type Infer<T extends ZodTypeAny> = z.infer<T>;
