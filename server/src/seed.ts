@@ -3,6 +3,7 @@ import { hashPassword } from './lib/password.js';
 import { ensureWalletCounter, createWalletForUser } from './services/walletService.js';
 import { isDerivationConfigured } from './chain/derivation.js';
 import { logger } from './lib/logger.js';
+import { env } from './env.js';
 
 /**
  * Bootstraps the first admin account and the wallet counter.
@@ -11,8 +12,8 @@ import { logger } from './lib/logger.js';
 async function main() {
   await ensureWalletCounter();
 
-  const email = (process.env.SEED_ADMIN_EMAIL ?? 'admin@cafsdrychain.io').toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe!2026';
+  const email = (env.SEED_ADMIN_EMAIL ?? 'admin@cafsdrychain.io').toLowerCase();
+  const password = env.SEED_ADMIN_PASSWORD ?? 'ChangeMe!2026';
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

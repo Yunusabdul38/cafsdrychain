@@ -255,7 +255,11 @@ export default function AdminOperators() {
                           <span>{titleCase(u.location) ?? "—"}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          {u.id === currentUser?.id ? (
+                          {u.isRootAdmin ? (
+                            <span className="text-xs font-medium text-muted">
+                              Primary admin
+                            </span>
+                          ) : u.id === currentUser?.id ? (
                             <span className="text-xs text-muted font-medium">Current session</span>
                           ) : (
                             <>
@@ -336,7 +340,11 @@ export default function AdminOperators() {
                           <StatusPill status={u.status} />
                         </td>
                         <td className="px-5 py-3.5 text-right relative">
-                          {u.id === currentUser?.id ? (
+                          {u.isRootAdmin ? (
+                            <span className="pr-2 text-xs font-medium text-muted">
+                              Primary admin
+                            </span>
+                          ) : u.id === currentUser?.id ? (
                             <span className="text-xs text-muted font-medium pr-2">Current session</span>
                           ) : (
                             <div className="flex justify-end">

@@ -10,6 +10,8 @@ export type ApiUser = {
   email: string;
   role: Role;
   status: "PENDING" | "ACTIVE" | "INACTIVE";
+  /** The primary admin: cannot be deactivated or deleted. */
+  isRootAdmin?: boolean;
   location?: string | null;
   createdAt: string;
   wallet?: { address: string; index: number; chain: string; derivationPath: string } | null;

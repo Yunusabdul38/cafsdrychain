@@ -61,8 +61,7 @@ export async function sendPasswordResetEmail(to: string, name: string, link: str
         <!-- Footer -->
         <tr style="background-color: #f7f9f8; border-top: 1px solid rgba(0,0,0,0.06);">
           <td style="padding: 24px; text-align: center; font-size: 12px; color: #718096; line-height: 1.5;">
-            This is an automated system email from CAFS DryChain.<br />
-            Need assistance? Contact us at <a href="mailto:support@cafsdrychain.io" style="color: #2ca873; text-decoration: none; font-weight: 500;">support@cafsdrychain.io</a>
+            This is an automated system email from CAFS DryChain.
           </td>
         </tr>
       </table>
@@ -170,8 +169,7 @@ export async function sendInviteEmail(to: string, name: string, link: string, ro
         <!-- Footer -->
         <tr style="background-color: #f7f9f8; border-top: 1px solid rgba(0,0,0,0.06);">
           <td style="padding: 24px; text-align: center; font-size: 12px; color: #718096; line-height: 1.5;">
-            This invitation was sent by your workspace administrator.<br />
-            Need assistance? Contact us at <a href="mailto:support@cafsdrychain.io" style="color: #2ca873; text-decoration: none; font-weight: 500;">support@cafsdrychain.io</a>
+            This invitation was sent by your workspace administrator.
           </td>
         </tr>
       </table>

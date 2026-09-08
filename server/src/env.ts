@@ -43,6 +43,11 @@ const schema = z.object({
   // Payments — 'stub' issues a self-serve test link; swap for a real gateway.
   PAYMENT_PROVIDER: z.enum(['stub', 'paystack', 'flutterwave']).default('stub'),
 
+  // The primary administrator. Seeded on boot, and protected from being
+  // deactivated or deleted so the system always has one way back in.
+  SEED_ADMIN_EMAIL: z.string().email().optional(),
+  SEED_ADMIN_PASSWORD: z.string().min(8).optional(),
+
   // Email
   RESEND_API_KEY: z.string().optional(),
   /// Where the public contact form delivers. Logged instead when unset.

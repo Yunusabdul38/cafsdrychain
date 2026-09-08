@@ -7,6 +7,7 @@ import { logger } from '../lib/logger.js';
 import { createWalletForUser } from './walletService.js';
 import { grantOperatorRoles } from '../chain/relayer.js';
 import { AppError } from '../middleware/error.js';
+import { env } from '../env.js';
 import type { CreateUserInput } from '../schemas/index.js';
 
 const publicUser = {
@@ -19,6 +20,34 @@ const publicUser = {
   createdAt: true,
   wallet: { select: { address: true, index: true, chain: true, derivationPath: true } },
 } as const;
+
+/**
+ * The account named by SEED_ADMIN_EMAIL is the way back in when everything else
+ * fails: it is recreated by the seed on every boot and is the only guaranteed
+ * administrator. It cannot be deactivated or deleted, by anyone, including
+ * itself — otherwise a single mistaken click could leave nobody able to
+ * provision operators, pause the registry, or authorise a contract upgrade.
+ */
+function assertNotRootAdmin(email: string, action: string) {
+  const root = env.SEED_ADMIN_EMAIL?.toLowerCase();
+  if (root && email.toLowerCase() === root) {
+    throw new AppError(
+      403,
+      `${email} is the primary administrator account and cannot be ${action}.`
+    );
+  }
+}
+
+/** Whether this address is the protected primary administrator. */
+export function isRootAdmin(email: string): boolean {
+  const root = env.SEED_ADMIN_EMAIL?.toLowerCase();
+  return Boolean(root && email.toLowerCase() === root);
+}
+
+/** Adds the protection flag the UI needs to hide destructive actions. */
+function withFlags<T extends { email: string }>(user: T) {
+  return { ...user, isRootAdmin: isRootAdmin(user.email) };
+}
 
 /**
  * Admin provisions a user. Every new user atomically gets a deterministic HD
@@ -102,18 +131,24 @@ export async function createUser(input: CreateUserInput) {
   return { user: withWallet };
 }
 
-export function listUsers() {
-  return prisma.user.findMany({ orderBy: { createdAt: 'desc' }, select: publicUser });
+export async function listUsers() {
+  const users = await prisma.user.findMany({
+    orderBy: { createdAt: 'desc' },
+    select: publicUser,
+  });
+  return users.map(withFlags);
 }
 
-export function getUser(id: string) {
-  return prisma.user.findUnique({ where: { id }, select: publicUser });
+export async function getUser(id: string) {
+  const user = await prisma.user.findUnique({ where: { id }, select: publicUser });
+  return user ? withFlags(user) : null;
 }
 
 export async function updateUserStatus(id: string, status: 'ACTIVE' | 'INACTIVE') {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
-  
+  if (status === 'INACTIVE') assertNotRootAdmin(user.email, 'deactivated');
+
   const updated = await prisma.user.update({
     where: { id },
     data: { status },
@@ -137,6 +172,7 @@ export async function updateUserStatus(id: string, status: 'ACTIVE' | 'INACTIVE'
 export async function deleteUser(id: string) {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new AppError(404, 'User not found');
+  assertNotRootAdmin(user.email, 'deleted');
 
   const batchCount = await prisma.batch.count({ where: { operatorId: id } });
 

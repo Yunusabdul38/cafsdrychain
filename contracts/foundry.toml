@@ -13,3 +13,10 @@ ffi = false
 # Remappings live in remappings.txt
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+# Explorer verification. One Etherscan V2 key covers Base; export it as
+# ETHERSCAN_API_KEY so `forge script --verify` and `forge verify-contract`
+# both pick it up without the key appearing on the command line.
+[etherscan]
+base-sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 84532 }
+base = { key = "${ETHERSCAN_API_KEY}", chain = 8453 }
