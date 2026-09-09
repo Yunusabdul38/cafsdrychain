@@ -17,34 +17,37 @@ The relayer wallet `0x486E22Ec9CDba5Ed7D082592F8C033e5f52C69C6` sponsors all gas
 
 ---
 
-## 1. `InTransit` is retired, and must be deleted on the next fresh deploy
+## 1. Two retired stages must be deleted on the next fresh deploy
 
 **Status:** DONE for the upgrade path. **OPEN for a fresh redeploy.**
 
-The dispatch stage is gone from the product. `updateLogistics` refuses to write
-it, and the only route out of storage is `InStorage → Delivered`.
+Both dispatch and storage are gone from the product. The lifecycle is now
+`Registered → DryingStarted → DryingCompleted → Delivered`, and
+`updateLogistics` accepts nothing but `Delivered`.
 
-The enum member survives as `InTransit_Retired` at position 4 **only because
-this is an upgrade**. Enum values are stored as their position, so deleting it
-would renumber `Delivered` from 5 to 4 and make every batch already delivered on
-chain decode as an out-of-range value. Keeping the slot is the price of not
-breaking existing records.
+The two enum members survive as `InStorage_Retired` (3) and `InTransit_Retired`
+(4) **only because these were upgrades**. Enum values are stored as their
+position, so deleting either would renumber `Delivered` from 5 and make every
+batch already delivered on chain decode as something else. Keeping the slots is
+the price of not breaking existing records.
 
-### On the next fresh deploy, delete it properly
+### On the next fresh deploy, delete them properly
 
 A brand new proxy starts with no batches, so there is no historical state to
 protect and renumbering is harmless. At that point:
 
-1. Delete `InTransit_Retired` from `BatchState` entirely, leaving
-   `Registered, DryingStarted, DryingCompleted, InStorage, Delivered`.
-2. Drop the `InTransit_Retired` branches from `_assertTransition` and
-   `canTransition` — they exist only so a legacy batch could still finish.
+1. Delete both retired members from `BatchState`, leaving
+   `Registered, DryingStarted, DryingCompleted, Delivered`.
+2. Drop their branches from `_assertTransition` and `canTransition` — they exist
+   only so a legacy batch stuck at storage or dispatch could still finish.
 3. Update `relayLogistics` in `server/src/chain/relayer.ts`: its state argument
-   is typed `3 | 4 | 5` and passes `5` for delivered. **`Delivered` becomes 4.**
-   This is the step that breaks silently if forgotten.
-4. Remove the two tests pinning the retired slot
+   is pinned to `5` for delivered. **`Delivered` becomes 3.** This is the step
+   that breaks silently if forgotten.
+4. Remove the tests pinning the retired slots
    (`test_RevertWhen_WritingRetiredInTransit`,
-   `test_RetiredStageKeepsDeliveredAtPositionFive`).
+   `test_RevertWhen_WritingRetiredStorage`,
+   `test_RetiredStageKeepsDeliveredAtPositionFive`, and the legacy-recovery
+   transition tests).
 
 Do **not** do any of this as an upgrade to the current proxy.
 
@@ -84,6 +87,8 @@ than one dead field.
 
 - `Batch.supplier` — nullable, no longer collected
 - `Batch.transport` — no longer collected
+- `Batch.storageLocation` — the storage stage is retired; legacy rows still hold
+  values, but nothing reads them
 - `Batch.packaging` — no longer collected
 - `Batch.entryDate` is mapped to the physical column `deliveryDate` via
   `@map`. Renaming the column needs `prisma migrate deploy` on Railway, because
@@ -114,7 +119,7 @@ unfilterable.
 
 ---
 
-## Done in this revision
+## What the hardening upgrade added (2026-09-03)
 
 Applied to `BatchRegistry` and `RoleManager`, ready to ship via
 `script/UpgradeBatchRegistry.s.sol`. No storage was added, so the upgrade needs
@@ -144,3 +149,16 @@ provisioning permanently.
 **Upgrade script fixed.** It deployed the test mock `BatchRegistryV2` onto the
 live proxy. It now deploys `BatchRegistry`, asserts the forwarder matches and
 the broadcaster holds admin, and verifies state survived.
+
+---
+
+## Deployment log
+
+| Date | Implementation | What changed |
+| --- | --- | --- |
+| 2026-09-03 | `0x5b33B2f2379F357d014869F23f32A36354e06CB0` | Lifecycle enforcement, input validation, weight guard, indexed events, admin lock-out. `InTransit` retired. |
+| 2026-09-09 | `0x9BDf6252AaFA88CCa7D010e08673a76F27E6582d` | `InStorage` retired: `DryingCompleted → Delivered` is now the only path to delivery, with a legacy escape for batches sitting at storage or dispatch. |
+
+The proxy is unchanged throughout and all 17 batches survived both upgrades.
+Both implementations are verified — always pass `--verify`, or the explorer
+renders this contract's event logs as raw hex.

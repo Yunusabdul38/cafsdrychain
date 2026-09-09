@@ -33,7 +33,7 @@ contract BatchRegistryTest is Test {
     BatchRegistry.BatchState constant REGISTERED = BatchRegistry.BatchState.Registered;
     BatchRegistry.BatchState constant DRYING = BatchRegistry.BatchState.DryingStarted;
     BatchRegistry.BatchState constant DRIED = BatchRegistry.BatchState.DryingCompleted;
-    BatchRegistry.BatchState constant STORED = BatchRegistry.BatchState.InStorage;
+    BatchRegistry.BatchState constant STORED = BatchRegistry.BatchState.InStorage_Retired;
     BatchRegistry.BatchState constant TRANSIT = BatchRegistry.BatchState.InTransit_Retired;
     BatchRegistry.BatchState constant DELIVERED = BatchRegistry.BatchState.Delivered;
 
@@ -87,8 +87,6 @@ contract BatchRegistryTest is Test {
         if (target == DRYING) return;
         _dry(id, DRIED, 300);
         if (target == DRIED) return;
-        _move(id, STORED);
-        if (target == STORED) return;
         _move(id, DELIVERED);
     }
 
@@ -111,9 +109,8 @@ contract BatchRegistryTest is Test {
         assertEq(registry.totalBatches(), 1);
     }
 
-    function test_FullLifecycle_ViaStorageToDelivered() public {
-        _advanceTo("DRY-2", STORED);
-        _move("DRY-2", DELIVERED);
+    function test_FullLifecycle_DriedToDelivered() public {
+        _advanceTo("DRY-2", DELIVERED);
 
         BatchRegistry.Batch memory b = registry.getBatch("DRY-2");
         assertEq(uint8(b.state), uint8(DELIVERED));
@@ -122,21 +119,24 @@ contract BatchRegistryTest is Test {
         assertFalse(registry.verifyMetadata("DRY-2", "tampered"));
     }
 
-    function test_FullLifecycle_StorageToDelivered() public {
-        _advanceTo("DRY-3", DELIVERED);
-        assertEq(uint8(registry.getBatchState("DRY-3")), uint8(DELIVERED));
-    }
-
-    /// The dispatch stage is retired: it can no longer be written at all.
-    function test_RevertWhen_WritingRetiredInTransit() public {
-        _advanceTo("RT-1", STORED);
+    /// Storage and dispatch are retired: neither can be written any more.
+    function test_RevertWhen_WritingRetiredStorage() public {
+        _advanceTo("RT-1", DRIED);
         vm.prank(logistics);
         vm.expectRevert(BatchRegistry.InvalidState.selector);
-        registry.updateLogistics("RT-1", "WH", TRANSIT, "m");
+        registry.updateLogistics("RT-1", "WH", STORED, "m");
     }
 
-    /// Its numbering is preserved so delivered batches still decode correctly.
-    function test_RetiredStageKeepsDeliveredAtPositionFive() public {
+    function test_RevertWhen_WritingRetiredInTransit() public {
+        _advanceTo("RT-2", DRIED);
+        vm.prank(logistics);
+        vm.expectRevert(BatchRegistry.InvalidState.selector);
+        registry.updateLogistics("RT-2", "WH", TRANSIT, "m");
+    }
+
+    /// Their numbering is preserved so delivered batches still decode correctly.
+    function test_RetiredStagesKeepDeliveredAtPositionFive() public pure {
+        assertEq(uint8(BatchRegistry.BatchState.InStorage_Retired), 3);
         assertEq(uint8(BatchRegistry.BatchState.InTransit_Retired), 4);
         assertEq(uint8(BatchRegistry.BatchState.Delivered), 5);
     }
@@ -174,13 +174,13 @@ contract BatchRegistryTest is Test {
         registry.updateDryingSession("T2", "OYO", DRIED, 200, "m");
     }
 
-    function test_RevertWhen_StoringBeforeDryingCompletes() public {
+    function test_RevertWhen_DeliveringBeforeDryingCompletes() public {
         _advanceTo("T3", DRYING);
         vm.prank(logistics);
         vm.expectRevert(
-            abi.encodeWithSelector(BatchRegistry.InvalidTransition.selector, DRYING, STORED)
+            abi.encodeWithSelector(BatchRegistry.InvalidTransition.selector, DRYING, DELIVERED)
         );
-        registry.updateLogistics("T3", "WH", STORED, "m");
+        registry.updateLogistics("T3", "WH", DELIVERED, "m");
     }
 
     function test_RevertWhen_DeliveringStraightFromRegistered() public {
@@ -193,17 +193,16 @@ contract BatchRegistryTest is Test {
     }
 
     function test_RevertWhen_MovingBackwards() public {
-        _advanceTo("T5", STORED);
+        _advanceTo("T5", DELIVERED);
         vm.prank(dryerOperator);
         vm.expectRevert(
-            abi.encodeWithSelector(BatchRegistry.InvalidTransition.selector, STORED, DRYING)
+            abi.encodeWithSelector(BatchRegistry.InvalidTransition.selector, DELIVERED, DRYING)
         );
         registry.updateDryingSession("T5", "OYO", DRYING, 100, "m");
     }
 
     function test_RevertWhen_TouchingADeliveredBatch() public {
-        _advanceTo("T6", STORED);
-        _move("T6", DELIVERED);
+        _advanceTo("T6", DELIVERED);
 
         vm.prank(logistics);
         vm.expectRevert(
@@ -213,7 +212,7 @@ contract BatchRegistryTest is Test {
     }
 
     function test_RevertWhen_DryingStateGivenToLogistics() public {
-        _advanceTo("T7", REGISTERED);
+        _advanceTo("T7", DRIED);
         vm.prank(logistics);
         vm.expectRevert(BatchRegistry.InvalidState.selector);
         registry.updateLogistics("T7", "WH", DRYING, "m");
@@ -228,11 +227,11 @@ contract BatchRegistryTest is Test {
 
     function test_CanTransition_MatchesEnforcement() public {
         _advanceTo("T9", DRIED);
-        assertTrue(registry.canTransition("T9", STORED));
-        assertFalse(registry.canTransition("T9", DELIVERED));
+        assertTrue(registry.canTransition("T9", DELIVERED));
+        assertFalse(registry.canTransition("T9", STORED));
         assertFalse(registry.canTransition("T9", TRANSIT));
         assertFalse(registry.canTransition("T9", DRYING));
-        assertFalse(registry.canTransition("UNKNOWN", STORED));
+        assertFalse(registry.canTransition("UNKNOWN", DELIVERED));
     }
 
     // ------------------------------------------------------ input validation --
@@ -260,7 +259,7 @@ contract BatchRegistryTest is Test {
         _advanceTo("E3", DRIED);
         vm.prank(logistics);
         vm.expectRevert(BatchRegistry.EmptyMetadata.selector);
-        registry.updateLogistics("E3", "WH", STORED, "");
+        registry.updateLogistics("E3", "WH", DELIVERED, "");
     }
 
     function test_RevertWhen_ZeroFreshWeight() public {
@@ -328,7 +327,7 @@ contract BatchRegistryTest is Test {
         _advanceTo("R2", DRIED);
         vm.prank(dryerOperator); // holds DRYER_OPERATOR, not LOGISTICS
         vm.expectRevert(BatchRegistry.Unauthorized.selector);
-        registry.updateLogistics("R2", "WH", STORED, "m");
+        registry.updateLogistics("R2", "WH", DELIVERED, "m");
     }
 
     function test_RevertWhen_RevokedOperatorWrites() public {
@@ -391,12 +390,12 @@ contract BatchRegistryTest is Test {
 
         vm.prank(logistics);
         vm.expectRevert();
-        registry.updateLogistics("P1", "WH", STORED, "m");
+        registry.updateLogistics("P1", "WH", DELIVERED, "m");
 
         vm.prank(admin);
         registry.unpause();
-        _move("P1", STORED);
-        assertEq(uint8(registry.getBatchState("P1")), uint8(STORED));
+        _move("P1", DELIVERED);
+        assertEq(uint8(registry.getBatchState("P1")), uint8(DELIVERED));
     }
 
     function test_RevertWhen_NonAdminPauses() public {

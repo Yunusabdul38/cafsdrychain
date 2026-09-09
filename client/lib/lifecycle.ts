@@ -27,10 +27,12 @@ export const nextActionByStage: Record<BatchStage, NextAction | null> = {
     next: "dried",
   },
   dried: {
-    label: "Record storage",
-    heading: "Record storage details",
-    next: "stored",
+    label: "Record delivery",
+    heading: "Record delivery details",
+    next: "delivered",
   },
+  // Legacy: no new batch reaches this stage, but one already there must still
+  // be completable.
   stored: {
     label: "Record delivery",
     heading: "Record delivery details",

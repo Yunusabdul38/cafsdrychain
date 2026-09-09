@@ -36,7 +36,6 @@ export type ApiBatch = {
   dryingEnd?: string | null;
   dryingMethod?: string | null;
   quality?: string | null;
-  storageLocation?: string | null;
   destination?: string | null;
   stage: ApiStage;
   location: string;
@@ -99,7 +98,6 @@ export type AdvanceBatchInput = {
   finalWeight?: number;
   moisture?: number;
   quality?: string;
-  storageLocation?: string;
   destination?: string;
   notes?: string;
 };

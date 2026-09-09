@@ -21,7 +21,6 @@ const ORDER: BatchStage[] = [
   'AWAITING_PAYMENT',
   'DRYING',
   'DRIED',
-  'STORED',
   'DELIVERED',
 ];
 
@@ -30,8 +29,10 @@ const EVENT_TITLE: Record<BatchStage, string> = {
   AWAITING_PAYMENT: 'Drying fee set',
   DRYING: 'Drying started',
   DRIED: 'Drying completed',
+  // Retired stages. Unreachable for new batches, kept so historical events
+  // still render a title.
   STORED: 'Moved to storage',
-  IN_TRANSIT: 'Dispatched', // legacy — no longer reachable, kept for historical events
+  IN_TRANSIT: 'Dispatched',
   DELIVERED: 'Delivered',
 };
 
@@ -67,7 +68,6 @@ function hashBatch(b: Record<string, unknown>): string {
     moisture: b.moisture ?? null,
     dryingMethod: b.dryingMethod ?? null,
     stage: b.stage,
-    storageLocation: b.storageLocation ?? null,
     destination: b.destination ?? null,
   });
 }
@@ -229,9 +229,6 @@ export async function advanceBatch(
       if (input.moisture !== undefined) data.moisture = input.moisture;
       if (input.quality) data.quality = input.quality;
       break;
-    case 'STORED':
-      if (input.storageLocation) data.storageLocation = input.storageLocation;
-      break;
     case 'DELIVERED':
       if (input.destination) data.destination = input.destination;
       break;
@@ -261,13 +258,11 @@ export async function advanceBatch(
   const index = batch.operator.wallet?.index;
   if (index !== undefined) {
     let res: RelayResult;
-    const facility = (data.storageLocation as string) || batch.location;
+    const facility = batch.location;
     if (target === 'DRYING') {
       res = await relayDrying(index, batchId, facility, 1, batch.freshWeight, hash);
     } else if (target === 'DRIED') {
       res = await relayDrying(index, batchId, facility, 2, input.finalWeight ?? batch.freshWeight, hash);
-    } else if (target === 'STORED') {
-      res = await relayLogistics(index, batchId, facility, 3, hash);
     } else {
       res = await relayLogistics(index, batchId, facility, 5, hash);
     }
@@ -334,7 +329,6 @@ export async function getPublicBatch(batchId: string) {
     dryingEnd: b.dryingEnd,
     stage: b.stage,
     location: b.location,
-    storageLocation: b.storageLocation,
     destination: b.destination,
     entryDate: b.entryDate,
     verified: b.chainStatus === 'CONFIRMED',

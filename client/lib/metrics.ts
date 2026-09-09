@@ -24,14 +24,12 @@ function countEvents(batches: Batch[]): number {
 
 export function operatorMetrics(batches: Batch[]): Stat[] {
   const drying = batches.filter((b) => b.stage === "drying").length;
-  const inStorage = batches.filter(
-    (b) => b.stage === "stored" || b.stage === "in-transit"
-  ).length;
+  const dried = batches.filter((b) => b.stage === "dried").length;
   const delivered = batches.filter((b) => b.stage === "delivered").length;
   return [
     { label: "My batches", value: String(batches.length), hint: "assigned" },
     { label: "Drying now", value: String(drying), hint: "needs update" },
-    { label: "In storage", value: String(inStorage), hint: "ready to ship" },
+    { label: "Dried", value: String(dried), hint: "ready to deliver" },
     { label: "Delivered", value: String(delivered), hint: "completed" },
   ];
 }

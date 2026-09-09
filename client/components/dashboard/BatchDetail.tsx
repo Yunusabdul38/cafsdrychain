@@ -177,9 +177,8 @@ export default function BatchDetail({
           </Card>
 
           <Card>
-            <CardHeader title="Storage & distribution" />
+            <CardHeader title="Distribution" />
             <dl className="divide-y divide-black/[0.06]">
-              <DetailRow label="Storage location" value={titleCase(batch.storageLocation)} />
               <DetailRow label="Destination" value={titleCase(batch.destination)} />
             </dl>
           </Card>

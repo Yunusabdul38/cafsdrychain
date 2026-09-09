@@ -41,11 +41,10 @@ const steps: Step[] = [
   },
   {
     icon: <BoxIcon className="h-6 w-6" />,
-    title: "Storage & Distribution",
+    title: "Distribution",
     description:
       "Once drying completes, the system captures how and where the product moves, making every step traceable from production to delivery.",
     points: [
-      "Storage location",
       "Transportation information",
       "Destination or buyer",
     ],

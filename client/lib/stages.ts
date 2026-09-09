@@ -20,6 +20,5 @@ export const STAGE_ORDER: BatchStage[] = [
   "awaiting-payment",
   "drying",
   "dried",
-  "stored",
   "delivered",
 ];

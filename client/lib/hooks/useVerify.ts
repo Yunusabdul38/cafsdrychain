@@ -18,7 +18,6 @@ export type PublicRecord = {
   dryingEnd?: string | null;
   stage: string;
   location: string;
-  storageLocation?: string | null;
   destination?: string | null;
   entryDate: string;
   verified: boolean;

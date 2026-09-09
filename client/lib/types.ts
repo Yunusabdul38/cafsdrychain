@@ -34,7 +34,6 @@ export type Batch = {
   dryingEnd?: string;
   dryingMethod?: string;
   quality?: string;
-  storageLocation?: string;
   destination?: string;
   stage: BatchStage;
   payment?: {

@@ -69,11 +69,7 @@ export default function AdvanceForm({
       },
       dried: {
         title: "Drying complete",
-        body: "The quality data is recorded. Next, move the batch into storage and record where it is kept.",
-      },
-      stored: {
-        title: "Moved to storage",
-        body: "The storage location is saved. Record the delivery details once the batch reaches the buyer.",
+        body: "The quality data is recorded. Record the delivery details once the batch reaches the buyer.",
       },
       delivered: {
         title: "Delivery confirmed",
@@ -96,7 +92,6 @@ export default function AdvanceForm({
             { label: "Drying method", value: titleCase(done.dryingMethod) },
             { label: "Moisture", value: done.moisture != null ? `${done.moisture}%` : null },
             { label: "Quality", value: titleCase(done.quality) },
-            { label: "Storage location", value: titleCase(done.storageLocation) },
             { label: "Destination", value: titleCase(done.destination) },
           ]}
         >
@@ -193,7 +188,6 @@ export default function AdvanceForm({
       finalWeight: num("final"),
       moisture: num("moisture"),
       quality: str("quality"),
-      storageLocation: str("storage"),
       destination: str("destination"),
       notes: composeNote(),
     };
@@ -393,20 +387,7 @@ function Fields({
     );
   }
 
-  if (stage === "dried") {
-    return (
-      <Input
-        id="storage"
-        name="storage"
-        label="Storage location"
-        placeholder="Ìtàkùn Store · Rack 14"
-        required
-        error={errors.storageLocation?.[0]}
-      />
-    );
-  }
-
-  if (stage === "stored") {
+  if (stage === "dried" || stage === "stored") {
     return (
       <>
         <Input

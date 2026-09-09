@@ -27,10 +27,10 @@ import {RoleManager} from "./RoleManager.sol";
  * bypassed by anyone holding an operator key and talking to the chain directly.
  * So the invariants live here.
  *
- *  - Every batch follows one forward-only path. A stage cannot be skipped,
- *    repeated, or walked backwards.
- *  - A batch cannot be dried before it exists, stored before it is dried, or
- *    delivered before it is stored.
+ *  - Every batch follows one forward-only path: registered, drying, dried,
+ *    delivered. A stage cannot be skipped, repeated, or walked backwards.
+ *  - A batch cannot be dried before it exists, or delivered before it is
+ *    dried.
  *  - Drying cannot increase a batch's weight, and no recorded weight may be
  *    zero.
  *  - Identifiers and metadata hashes cannot be empty.
@@ -57,10 +57,11 @@ contract BatchRegistry is
         Registered, // 0
         DryingStarted, // 1
         DryingCompleted, // 2
-        InStorage, // 3
-        // 4 is retired. The value must stay declared: enum members are stored
-        // as their position, so deleting it would renumber Delivered from 5 to
-        // 4 and make every batch already delivered on chain undecodable.
+        // 3 and 4 are retired stages. Their values must stay declared: enum
+        // members are stored as their position, so deleting either would
+        // renumber Delivered and make every batch already delivered on chain
+        // decode as something else entirely.
+        InStorage_Retired, // 3 — rejected on write, kept so old records decode
         InTransit_Retired, // 4 — rejected on write, kept so old records decode
         Delivered // 5
     }
@@ -239,9 +240,9 @@ contract BatchRegistry is
     }
 
     /**
-     * @notice Record storage or delivery.
-     * @dev The dispatch stage has been retired: a batch goes from storage
-     *      straight to delivered. Writing the retired value is refused.
+     * @notice Record delivery.
+     * @dev Storage and dispatch are both retired: a batch goes from dried
+     *      straight to delivered. Writing either retired value is refused.
      */
     function updateLogistics(
         string calldata batchId,
@@ -253,9 +254,7 @@ contract BatchRegistry is
 
         Batch storage batch = _mustExist(batchId);
 
-        if (newState != BatchState.InStorage && newState != BatchState.Delivered) {
-            revert InvalidState();
-        }
+        if (newState != BatchState.Delivered) revert InvalidState();
         _assertTransition(batch.state, newState);
 
         batch.state = newState;
@@ -282,8 +281,7 @@ contract BatchRegistry is
      *
      *  Registered      → DryingStarted
      *  DryingStarted   → DryingCompleted
-     *  DryingCompleted → InStorage
-     *  InStorage       → Delivered
+     *  DryingCompleted → Delivered
      *  Delivered       → (terminal)
      */
     function _assertTransition(BatchState from, BatchState to) private pure {
@@ -294,12 +292,12 @@ contract BatchRegistry is
         } else if (from == BatchState.DryingStarted) {
             ok = to == BatchState.DryingCompleted;
         } else if (from == BatchState.DryingCompleted) {
-            ok = to == BatchState.InStorage;
-        } else if (from == BatchState.InStorage) {
             ok = to == BatchState.Delivered;
-        } else if (from == BatchState.InTransit_Retired) {
-            // No batch can enter this stage any more, but one recorded before
-            // it was retired must still be completable rather than stranded.
+        } else if (
+            from == BatchState.InStorage_Retired || from == BatchState.InTransit_Retired
+        ) {
+            // No batch can enter these stages any more, but one recorded before
+            // they were retired must still be completable rather than stranded.
             ok = to == BatchState.Delivered;
         }
         // Delivered is terminal: `ok` stays false.
@@ -351,9 +349,12 @@ contract BatchRegistry is
         BatchState from = b.state;
         if (from == BatchState.Registered) return to == BatchState.DryingStarted;
         if (from == BatchState.DryingStarted) return to == BatchState.DryingCompleted;
-        if (from == BatchState.DryingCompleted) return to == BatchState.InStorage;
-        if (from == BatchState.InStorage) return to == BatchState.Delivered;
-        if (from == BatchState.InTransit_Retired) return to == BatchState.Delivered;
+        if (from == BatchState.DryingCompleted) return to == BatchState.Delivered;
+        if (
+            from == BatchState.InStorage_Retired || from == BatchState.InTransit_Retired
+        ) {
+            return to == BatchState.Delivered;
+        }
         return false;
     }
 

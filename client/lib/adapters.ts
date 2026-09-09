@@ -31,7 +31,6 @@ export function toUiBatch(b: ApiBatch): Batch {
     dryingEnd: b.dryingEnd ?? undefined,
     dryingMethod: b.dryingMethod ?? undefined,
     quality: b.quality ?? undefined,
-    storageLocation: b.storageLocation ?? undefined,
     destination: b.destination ?? undefined,
     stage: apiStage(b.stage),
     payment: b.payment
@@ -77,7 +76,6 @@ export function publicToUiBatch(r: PublicRecord): Batch {
     dryingMethod: r.dryingMethod ?? undefined,
     dryingStart: r.dryingStart ?? undefined,
     dryingEnd: r.dryingEnd ?? undefined,
-    storageLocation: r.storageLocation ?? undefined,
     destination: r.destination ?? undefined,
     stage: apiStage(r.stage as ApiStage),
     operator: "—",

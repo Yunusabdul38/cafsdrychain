@@ -71,7 +71,10 @@ async function relay(index: number, data: string): Promise<RelayResult> {
   }
 }
 
-// On-chain BatchState: 0 Registered,1 DryingStarted,2 DryingCompleted,3 InStorage,4 InTransit,5 Delivered
+// On-chain BatchState: 0 Registered, 1 DryingStarted, 2 DryingCompleted, 5 Delivered.
+// 3 and 4 are retired slots the registry refuses to write; they stay declared so
+// batches recorded before those stages were dropped still decode. Delivered
+// keeps position 5 for that reason — renumber it only on a fresh deploy.
 
 export function relayRegister(
   index: number,
@@ -111,7 +114,7 @@ export function relayLogistics(
   index: number,
   batchId: string,
   facilityId: string,
-  state: 3 | 4 | 5,
+  state: 5,
   metadataHash: string
 ): Promise<RelayResult> {
   const data = batchRegistry().interface.encodeFunctionData('updateLogistics', [

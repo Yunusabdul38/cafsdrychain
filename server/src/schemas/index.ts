@@ -104,7 +104,6 @@ export const advanceBatchSchema = z.object({
   finalWeight: z.number().positive().max(1_000_000).optional(),
   moisture: z.number().min(0).max(100).optional(),
   quality: z.string().max(300).optional(),
-  storageLocation: z.string().max(200).optional(),
   destination: z.string().max(200).optional(),
   notes: z.string().max(500).optional(),
 });
