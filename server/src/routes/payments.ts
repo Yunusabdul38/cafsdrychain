@@ -21,12 +21,11 @@ router.post(
   publicLimiter,
   raw({ type: '*/*', limit: '100kb' }),
   asyncHandler(async (req, res) => {
-    const signature =
-      (req.header('x-bachs-signature-v2') ??
-        req.header('x-paystack-signature') ??
-        req.header('verif-hash') ??
-        req.header('x-signature')) ||
-      undefined;
+    // The V2 header specifically: it carries the timestamp inline, which the
+    // signed message needs, and repeats v1= once per valid secret so a rotation
+    // does not drop deliveries. The older X-Bachs-Signature is a bare digest
+    // with no timestamp and cannot be verified on its own.
+    const signature = req.header('x-bachs-signature-v2') || undefined;
 
     const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body ?? '');
     const result = getPaymentProvider().parseWebhook(body, signature);
