@@ -17,10 +17,22 @@ export type ApiUser = {
   wallet?: { address: string; index: number; chain: string; derivationPath: string } | null;
 };
 
+/**
+ * Backend roles are uppercase (ADMIN/OPERATOR); the UI compares lowercase, the
+ * same normalisation the auth store does for the signed-in user.
+ *
+ * Without this every `role === "operator"` test silently failed, so operator
+ * counts on the dashboard and hub cards always read zero.
+ */
+function toUiUser(u: ApiUser): ApiUser {
+  return { ...u, role: String(u.role).toLowerCase() as Role };
+}
+
 export function useUsers() {
   return useQuery({
     queryKey: ["users"],
-    queryFn: () => api.get<{ users: ApiUser[] }>("/api/users").then((r) => r.users),
+    queryFn: () =>
+      api.get<{ users: ApiUser[] }>("/api/users").then((r) => r.users.map(toUiUser)),
     // Poll every 15 seconds so operator/admin lists stay live.
     refetchInterval: 15_000,
   });

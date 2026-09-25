@@ -44,8 +44,8 @@ export default function AdminOperators() {
   const [activeMenuUserId, setActiveMenuUserId] = useState<string | null>(null);
   const [roleTab, setRoleTab] = useState<"operator" | "admin">("operator");
 
-  const operators = users?.filter((u) => u.role.toLowerCase() === "operator") ?? [];
-  const admins = users?.filter((u) => u.role.toLowerCase() === "admin") ?? [];
+  const operators = users?.filter((u) => u.role === "operator") ?? [];
+  const admins = users?.filter((u) => u.role === "admin") ?? [];
   const displayedUsers = roleTab === "operator" ? operators : admins;
 
   useEffect(() => {

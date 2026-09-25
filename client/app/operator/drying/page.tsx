@@ -10,7 +10,7 @@ import { LoadingState, ErrorState } from "@/components/dashboard/States";
 import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
 import { formatDate, titleCase } from "@/lib/utils";
-import { nextAction } from "@/lib/lifecycle";
+import { actionForBatch } from "@/lib/lifecycle";
 import { ChevronRightIcon, SunIcon } from "@/components/icons";
 import { LiveIndicator } from "@/components/ui/LiveIndicator";
 
@@ -52,7 +52,7 @@ function Section({ title, empty, batches }: { title: string; empty: string; batc
       ) : (
         <ul className="space-y-3">
           {batches.map((b) => {
-            const action = nextAction(b.stage)!;
+            const action = actionForBatch(b)!;
             return (
               <li key={b.id}>
                 <Card className="p-4">

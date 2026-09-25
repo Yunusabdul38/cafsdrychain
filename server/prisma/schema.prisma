@@ -193,14 +193,24 @@ model RefreshToken {
 model Location {
   id        String   @id @default(uuid())
   name      String   @unique
+  /// Whether this hub charges a drying fee. Gated by AppSettings.feesEnabled:
+  /// the global switch turns collection off everywhere, and this decides which
+  /// hubs collect when it is on.
+  ///
+  /// New hubs start off. Charging a supplier is a decision someone should make
+  /// deliberately, not something a hub inherits by being created.
+  feesEnabled Boolean @default(false)
   createdAt DateTime @default(now())
 }
 
-/// Single-row admin configuration. Drying fees are collected unless the admin
-/// turns them off; `minimumFee` is the floor an operator may charge, in kobo.
+/// Single-row admin configuration. `feesEnabled` is the master switch for
+/// drying fees; which hubs actually collect is set per hub on Location.
 model AppSettings {
   id          Int      @id @default(1)
   feesEnabled Boolean  @default(true)
+  /// Retired in favour of the per-hub toggle. Nothing reads it. The column
+  /// stays because Railway deploys with `prisma db push`, which refuses a
+  /// destructive change — drop it in the cleanup migration.
   minimumFee  Int      @default(0)
   updatedAt   DateTime @updatedAt
 }

@@ -7,7 +7,6 @@ import { updateSettingsSchema } from '../schemas/index.js';
 import { chainEnabled, provider, relayer } from '../chain/client.js';
 import { env } from '../env.js';
 import { getSettings, updateSettings } from '../services/settingsService.js';
-import { nairaToKobo } from '../services/paymentService.js';
 import { logger } from '../lib/logger.js';
 
 const router = Router();
@@ -68,12 +67,7 @@ router.patch(
   validate({ body: updateSettingsSchema }),
   requireLiveSession,
   asyncHandler(async (req, res) => {
-    const { feesEnabled, minimumFee } = req.body;
-    const settings = await updateSettings({
-      ...(feesEnabled !== undefined ? { feesEnabled } : {}),
-      // Admins enter whole naira; the column holds kobo so it matches Payment.amount.
-      ...(minimumFee !== undefined ? { minimumFee: nairaToKobo(minimumFee) } : {}),
-    });
+    const settings = await updateSettings({ feesEnabled: req.body.feesEnabled });
     logger.info({ settings, by: req.user!.sub }, 'Payment settings updated');
     res.json({ settings });
   })

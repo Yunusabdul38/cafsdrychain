@@ -5,12 +5,14 @@ import { useMemo, useState } from "react";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { LoadingState, ErrorState, EmptyState } from "@/components/dashboard/States";
+import { LoadingState, ErrorState, EmptyState, Spinner } from "@/components/dashboard/States";
 import { useBatches } from "@/lib/hooks/useBatches";
 import { useUsers } from "@/lib/hooks/useUsers";
 import { useLocations, useCreateLocation, useUpdateLocation } from "@/lib/hooks/useLocations";
+import { useSettings } from "@/lib/hooks/useAdmin";
+import Switch from "@/components/ui/Switch";
 import { toUiBatches } from "@/lib/adapters";
-import { BuildingIcon, PlusIcon, PencilIcon } from "@/components/icons";
+import { BuildingIcon, PlusIcon, PencilIcon, CheckIcon } from "@/components/icons";
 import { Input } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -21,6 +23,33 @@ export default function AdminLocations() {
   const locationsQ = useLocations();
   const createLocation = useCreateLocation();
   const updateLocation = useUpdateLocation();
+  const { data: settings } = useSettings();
+  // The master switch. With fees off globally, per-hub choices are inert, so
+  // the switches render off and disabled rather than lying about what happens.
+  const feesOn = settings?.feesEnabled ?? false;
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  // Confirmation is per hub, keyed by id: with several switches on one screen a
+  // single shared banner could not say which change actually landed.
+  const [feeSaved, setFeeSaved] = useState<string | null>(null);
+  const [feeError, setFeeError] = useState<{ id: string; message: string } | null>(null);
+
+  const toggleFees = async (id: string, feesEnabled: boolean) => {
+    setFeeError(null);
+    setFeeSaved(null);
+    setTogglingId(id);
+    try {
+      // Only after this resolves does the switch move: it is driven by the
+      // server's own response, so a dropped connection cannot leave an admin
+      // looking at a change that was never written.
+      await updateLocation.mutateAsync({ id, feesEnabled });
+      setFeeSaved(id);
+      setTimeout(() => setFeeSaved((cur) => (cur === id ? null : cur)), 3000);
+    } catch {
+      setFeeError({ id, message: "Not saved — check your connection and try again." });
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   // `null` = closed, `{ id: null }` = adding, `{ id }` = renaming that hub.
   const [dialog, setDialog] = useState<{ id: string | null } | null>(null);
@@ -56,6 +85,7 @@ export default function AdminLocations() {
       .map((loc) => ({
         id: loc.id,
         name: loc.name,
+        feesEnabled: loc.feesEnabled,
         batches: batches.filter((b) => b.location === loc.name).length,
         active: batches.filter((b) => b.location === loc.name && b.stage === "drying").length,
         operators: (usersQ.data ?? []).filter((u) => u.location === loc.name && u.role === "operator").length,
@@ -152,6 +182,43 @@ export default function AdminLocations() {
                 <Stat value={loc.active} label="Drying" />
                 <Stat value={loc.operators} label="Operators" />
               </div>
+
+              {/* Only meaningful while fees are on globally: with the master
+                  switch off nothing is collected anywhere, so showing a live
+                  control here would promise something it cannot deliver. */}
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/[0.06] pt-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-brand-dark">Drying fee</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted">
+                    {!feesOn
+                      ? "Fees are off for every hub"
+                      : loc.feesEnabled
+                      ? "Suppliers pay before drying starts"
+                      : "Drying starts with no payment"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {togglingId === loc.id && (
+                    <Spinner className="h-4 w-4 animate-spin text-brand" />
+                  )}
+                  <Switch
+                    checked={feesOn && loc.feesEnabled}
+                    disabled={!feesOn || togglingId === loc.id}
+                    label={`Collect a drying fee at ${loc.name}`}
+                    onChange={(next) => toggleFees(loc.id, next)}
+                  />
+                </div>
+              </div>
+
+              {feeSaved === loc.id && (
+                <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-brand">
+                  <CheckIcon className="h-3.5 w-3.5" />
+                  Saved. This hub {loc.feesEnabled ? "now charges" : "no longer charges"} a fee.
+                </p>
+              )}
+              {feeError?.id === loc.id && (
+                <p className="mt-2 text-xs font-medium text-red-600">{feeError.message}</p>
+              )}
             </Card>
           ))}
         </div>

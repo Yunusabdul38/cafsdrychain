@@ -3,11 +3,9 @@ import { asyncHandler } from '../lib/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth, requireRole, requireLiveSession } from '../middleware/auth.js';
 import { publicLimiter } from '../middleware/rateLimit.js';
-import { batchIdParam, createPaymentSchema, paymentReferenceParam } from '../schemas/index.js';
+import { batchIdParam, createPaymentSchema } from '../schemas/index.js';
 import * as paymentService from '../services/paymentService.js';
-import { paymentProvider } from '../payments/index.js';
-import { assertNotProduction } from '../payments/stub.js';
-import { AppError } from '../middleware/error.js';
+import { getPaymentProvider } from '../payments/index.js';
 
 const router = Router();
 
@@ -24,13 +22,14 @@ router.post(
   raw({ type: '*/*', limit: '100kb' }),
   asyncHandler(async (req, res) => {
     const signature =
-      (req.header('x-paystack-signature') ??
+      (req.header('x-bachs-signature-v2') ??
+        req.header('x-paystack-signature') ??
         req.header('verif-hash') ??
         req.header('x-signature')) ||
       undefined;
 
     const body = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body ?? '');
-    const result = paymentProvider.parseWebhook(body, signature);
+    const result = getPaymentProvider().parseWebhook(body, signature);
 
     // Always 200: a gateway retries on non-2xx, and an unverifiable payload will
     // never start verifying. Rejecting it loudly only invites a retry storm.
@@ -38,38 +37,6 @@ router.post(
 
     await paymentService.settlePayment(result.reference, result.status);
     res.status(200).json({ received: true });
-  })
-);
-
-/**
- * Test-only settlement for the stub gateway, standing in for a real webhook.
- * Refuses to run in production, and refuses outright unless the stub is active.
- */
-router.post(
-  '/:reference/simulate',
-  publicLimiter,
-  validate({ params: paymentReferenceParam }),
-  asyncHandler(async (req, res) => {
-    assertNotProduction();
-    if (paymentProvider.name !== 'stub') {
-      throw new AppError(404, 'Not available');
-    }
-    const outcome = req.body?.outcome === 'FAILED' ? 'FAILED' : 'PAID';
-    const payment = await paymentService.settlePayment(req.params.reference, outcome);
-    if (!payment) throw new AppError(404, 'Payment not found');
-    res.json({ payment });
-  })
-);
-
-/** Public lookup so the checkout page can show what is being paid for. */
-router.get(
-  '/:reference',
-  publicLimiter,
-  validate({ params: paymentReferenceParam }),
-  asyncHandler(async (req, res) => {
-    const payment = await paymentService.getPaymentByReference(req.params.reference);
-    if (!payment) throw new AppError(404, 'Payment not found');
-    res.json({ payment });
   })
 );
 
@@ -90,6 +57,25 @@ batchPaymentRoutes.post(
       req.body.amount
     );
     res.status(201).json({ payment });
+  })
+);
+
+/**
+ * Force a check against the gateway for a batch whose fee has not settled.
+ *
+ * The webhook is the normal path; this is the recovery one, for when it lags or
+ * never arrives. Operator-only: it is a support action, not something a payer
+ * needs, and it can only ever record what the gateway already reports.
+ */
+batchPaymentRoutes.post(
+  '/:batchId/payment/refresh',
+  requireAuth,
+  requireRole('OPERATOR', 'ADMIN'),
+  requireLiveSession,
+  validate({ params: batchIdParam }),
+  asyncHandler(async (req, res) => {
+    const payment = await paymentService.reconcileBatchPayment(req.params.batchId);
+    res.json({ payment });
   })
 );
 

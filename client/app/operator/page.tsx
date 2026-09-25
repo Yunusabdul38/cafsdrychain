@@ -13,7 +13,7 @@ import { LoadingState, ErrorState, EmptyState } from "@/components/dashboard/Sta
 import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
 import { operatorMetrics, recentActivity } from "@/lib/metrics";
-import { nextAction } from "@/lib/lifecycle";
+import { nextAction, actionForBatch } from "@/lib/lifecycle";
 import { ChevronRightIcon, PlusIcon, SunIcon, QrIcon } from "@/components/icons";
 
 export default function OperatorOverview() {
@@ -64,7 +64,7 @@ export default function OperatorOverview() {
               ) : (
                 <ul className="divide-y divide-black/[0.06]">
                   {attention.map((b) => {
-                    const action = nextAction(b.stage)!;
+                    const action = actionForBatch(b)!;
                     return (
                       <li key={b.id}>
                         <Link

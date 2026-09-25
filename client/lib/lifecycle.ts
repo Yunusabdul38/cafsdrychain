@@ -53,6 +53,28 @@ export function nextAction(stage: BatchStage) {
 }
 
 /**
+ * The action to offer for a given batch, which is not always the one its stage
+ * implies.
+ *
+ * A batch sitting at `awaiting-payment` with the fee unpaid cannot start
+ * drying, and the form it opens is the payment screen, not a drying form.
+ * Labelling that button "Start drying" told the operator the wrong thing about
+ * where they were going.
+ */
+export function actionForBatch(batch: {
+  stage: BatchStage;
+  payment?: { status: "PENDING" | "PAID" | "FAILED" } | null;
+}) {
+  const action = nextActionByStage[batch.stage];
+  if (!action) return null;
+
+  if (batch.stage === "awaiting-payment" && batch.payment?.status !== "PAID") {
+    return { ...action, label: "Share payment link", heading: "Awaiting payment" };
+  }
+  return action;
+}
+
+/**
  * How a stage should read for a given batch.
  *
  * A paid batch waits at the payment stage until drying starts, so "Payment"

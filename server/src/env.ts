@@ -40,8 +40,14 @@ const schema = z.object({
   FORWARDER_ADDRESS: z.string().optional(),
   RELAYER_PRIVATE_KEY: z.string().optional(), // master wallet that pays gas + is admin
 
-  // Payments — 'stub' issues a self-serve test link; swap for a real gateway.
-  PAYMENT_PROVIDER: z.enum(['stub', 'paystack', 'flutterwave']).default('stub'),
+  // Payments. Only read when drying fees are switched on in Admin > Settings.
+  PAYMENT_PROVIDER: z.enum(['bachs']).default('bachs'),
+  /// Bachs secret key. The prefix picks the environment: sk_sandbox_ hits the
+  /// sandbox, sk_live_ hits production, so going live is a key swap and a live
+  /// key can never be pointed at test money by mistake.
+  BACHS_SECRET_KEY: z.string().optional(),
+  /// Signing secret for the Bachs webhook endpoint, from the developer portal.
+  BACHS_WEBHOOK_SECRET: z.string().optional(),
 
   // The primary administrator. Seeded on boot, and protected from being
   // deactivated or deleted so the system always has one way back in.

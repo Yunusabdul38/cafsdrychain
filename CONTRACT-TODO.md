@@ -81,21 +81,43 @@ historical one.
 as `null` for new batches. Left in deliberately: churning the formula is riskier
 than one dead field.
 
-## 4. Columns to drop in a cleanup migration
+## 4. Schema cleanup for the mainnet cut-over
 
-**Status:** unused, harmless, tidy up when convenient.
+**Status:** deferred on purpose. Everything here is dead weight the app no
+longer reads, kept only because Railway deploys with `npx prisma db push`
+(see `server/railway.json`), which refuses a destructive change and would fail
+the deploy.
 
-- `Batch.supplier` — nullable, no longer collected
-- `Batch.transport` — no longer collected
-- `Batch.storageLocation` — the storage stage is retired; legacy rows still hold
-  values, but nothing reads them
-- `Batch.packaging` — no longer collected
-- `Batch.entryDate` is mapped to the physical column `deliveryDate` via
-  `@map`. Renaming the column needs `prisma migrate deploy` on Railway, because
-  `prisma db push` treats a rename as drop-plus-add and refuses without
-  `--accept-data-loss`.
+The plan is to do all of it in one pass when moving to mainnet, where the
+database is recreated from scratch and migrations are re-run — so nothing below
+needs a careful data migration, only deleting.
 
-Do all four together, and switch the Railway start command off `db push` first.
+### Columns to drop
+
+| Column | Why it is dead |
+| --- | --- |
+| `Batch.supplier` | no longer collected; still in the `hashBatch` formula, hashing as `null` |
+| `Batch.transport` | no longer collected |
+| `Batch.packaging` | no longer collected |
+| `Batch.storageLocation` | the storage stage is retired; legacy rows hold values nothing reads |
+| `User.mustChangePassword` | invitation links replaced the emailed-password flow |
+| `AppSettings.minimumFee` | replaced by the per-hub `Location.feesEnabled` toggle |
+
+### Rename
+
+`Batch.entryDate` is mapped to the physical column `deliveryDate` via `@map`.
+`db push` treats a rename as drop-plus-add, so the `@map` stays until the
+cut-over. Drop the `@map` and let the column take its real name.
+
+### Also at the cut-over
+
+- Delete the retired `BatchState` enum members (section 1) — that is the same
+  fresh-deploy pass.
+- Switch the Railway start command off `db push` to `prisma migrate deploy`, so
+  schema changes are versioned from then on rather than inferred.
+- Re-check `hashBatch()`: dropping `supplier` changes the hash formula. Safe by
+  itself — `verifyOnChain` compares the *stored* hash against the chain rather
+  than recomputing — but it is the moment to make the formula match reality.
 
 ## 5. Event args are not indexed
 

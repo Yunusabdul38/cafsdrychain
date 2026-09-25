@@ -39,10 +39,13 @@ router.post(
   })
 );
 
-// Rename a location - only ADMIN users can rename locations.
-// `User.location` and `Batch.location` store the hub name as a denormalized
-// string, so the rename cascades to them in the same transaction; otherwise
-// every operator and batch at that hub would be orphaned from the list.
+/**
+ * Update a hub: rename it, switch its fee collection on or off, or both.
+ *
+ * `User.location` and `Batch.location` store the hub name as a denormalized
+ * string, so a rename cascades to them in the same transaction; otherwise every
+ * operator and batch at that hub would be orphaned from the list.
+ */
 router.patch(
   '/:id',
   requireAuth,
@@ -50,14 +53,26 @@ router.patch(
   requireLiveSession,
   validate({ params: locationIdParam, body: updateLocationSchema }),
   asyncHandler(async (req, res) => {
-    const { name } = req.body;
+    const { name, feesEnabled } = req.body;
 
     const location = await prisma.location.findUnique({ where: { id: req.params.id } });
     if (!location) {
       return res.status(404).json({ error: 'Location not found' });
     }
-    if (location.name === name) {
-      return res.json({ location });
+
+    const renaming = name !== undefined && name !== location.name;
+
+    if (!renaming) {
+      // Nothing to cascade: either the name is unchanged or only the fee
+      // switch moved.
+      const updated =
+        feesEnabled === undefined
+          ? location
+          : await prisma.location.update({
+              where: { id: location.id },
+              data: { feesEnabled },
+            });
+      return res.json({ location: updated });
     }
 
     const clash = await prisma.location.findUnique({ where: { name } });
@@ -67,7 +82,10 @@ router.patch(
 
     const previousName = location.name;
     const [updated, users, batches] = await prisma.$transaction([
-      prisma.location.update({ where: { id: location.id }, data: { name } }),
+      prisma.location.update({
+        where: { id: location.id },
+        data: { name, ...(feesEnabled !== undefined ? { feesEnabled } : {}) },
+      }),
       prisma.user.updateMany({ where: { location: previousName }, data: { location: name } }),
       prisma.batch.updateMany({ where: { location: previousName }, data: { location: name } }),
     ]);

@@ -30,7 +30,6 @@ export function useRelayerWallet() {
 export type AppSettings = {
   feesEnabled: boolean;
   /** Minimum chargeable fee, in kobo. */
-  minimumFee: number;
 };
 
 export function useSettings() {
@@ -43,8 +42,14 @@ export function useSettings() {
 export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { feesEnabled?: boolean; minimumFee?: number }) =>
+    mutationFn: (input: { feesEnabled: boolean }) =>
       api.patch<{ settings: AppSettings }>("/api/admin/settings", input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
+    // Seed the cache from the server's own response rather than only
+    // invalidating: the switch is driven by this value, so it should move the
+    // moment the write is confirmed, not a refetch later.
+    onSuccess: (res) => {
+      qc.setQueryData(["settings"], res.settings);
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    },
   });
 }

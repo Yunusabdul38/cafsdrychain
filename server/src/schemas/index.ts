@@ -43,22 +43,26 @@ export const locationNameSchema = z
 
 export const createLocationSchema = z.object({ name: locationNameSchema });
 
-export const updateLocationSchema = z.object({ name: locationNameSchema });
+export const updateLocationSchema = z
+  .object({
+    name: locationNameSchema.optional(),
+    feesEnabled: z.boolean().optional(),
+  })
+  .refine((v) => v.name !== undefined || v.feesEnabled !== undefined, {
+    message: 'Nothing to update',
+  });
 
 export const locationIdParam = z.object({
   id: z.string().uuid('Invalid location id'),
 });
 
-/** Admin-configurable payment rules. */
-export const updateSettingsSchema = z
-  .object({
-    feesEnabled: z.boolean().optional(),
-    /** Floor an operator may charge, entered in whole naira (stored as kobo). */
-    minimumFee: z.number().int().min(0).max(100_000_000).optional(),
-  })
-  .refine((v) => v.feesEnabled !== undefined || v.minimumFee !== undefined, {
-    message: 'Nothing to update',
-  });
+/**
+ * Admin-configurable payment rules.
+ *
+ * The master switch only. Which hubs collect a fee is set per hub, through the
+ * locations API.
+ */
+export const updateSettingsSchema = z.object({ feesEnabled: z.boolean() });
 
 export const contactSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -115,10 +119,6 @@ export const createPaymentSchema = z.object({
     .int('Amount must be a whole number of naira')
     .positive('Amount must be greater than zero')
     .max(100_000_000, 'Amount is too large'),
-});
-
-export const paymentReferenceParam = z.object({
-  reference: z.string().min(4).max(120),
 });
 
 export const batchIdParam = z.object({

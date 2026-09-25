@@ -17,6 +17,11 @@ export type CreateLinkInput = {
   amount: number;
   currency: string;
   description: string;
+  /**
+   * Who is paying. Gateways bill a person, not a batch, and Bachs rejects a
+   * checkout without an email.
+   */
+  payer: { email: string; name: string };
 };
 
 export type CreateLinkResult = {

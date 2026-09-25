@@ -57,39 +57,22 @@ export function useWaivePayment(batchId: string) {
   });
 }
 
-export type PublicPayment = {
-  reference: string;
-  amount: number;
-  currency: string;
-  status: "PENDING" | "PAID" | "FAILED";
-  provider: string;
-  paidAt?: string | null;
-  batch: { batchId: string; product: string; location: string };
-};
-
-/** Unauthenticated lookup used by the checkout page. */
-export function usePublicPayment(reference: string) {
-  return useQuery({
-    queryKey: ["public-payment", reference],
-    queryFn: () =>
-      api
-        .get<{ payment: PublicPayment }>(`/api/payments/${reference}`, { auth: false })
-        .then((r) => r.payment),
-    enabled: Boolean(reference),
-    retry: false,
-  });
-}
-
-/** Stub gateway only — stands in for a real webhook while testing. */
-export function useSimulatePayment(reference: string) {
+/**
+ * Ask the gateway directly whether this batch's fee has gone through.
+ *
+ * The webhook normally settles a fee within seconds, but it can lag or be
+ * missed entirely — a failed delivery, a redeploy mid-flight — and the polling
+ * above only re-reads our own database, so it would spin forever. This is the
+ * operator's way out: it asks the gateway and settles on what it reports.
+ */
+export function useRefreshPayment(batchId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { outcome: "PAID" | "FAILED" }) =>
-      api.post<{ payment: PublicPayment }>(
-        `/api/payments/${reference}/simulate`,
-        input,
-        { auth: false }
-      ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["public-payment", reference] }),
+    mutationFn: () =>
+      api.post<{ payment: ApiPayment }>(`/api/batches/${batchId}/payment/refresh`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payment", batchId] });
+      qc.invalidateQueries({ queryKey: ["batches"] });
+    },
   });
 }

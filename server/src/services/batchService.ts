@@ -11,7 +11,7 @@ import {
 } from '../chain/relayer.js';
 import type { AdvanceBatchInput, CreateBatchInput } from '../schemas/index.js';
 import { assertPaidForDrying, waivePaymentForBatch } from './paymentService.js';
-import { getSettings } from './settingsService.js';
+import { feesApplyAt } from './settingsService.js';
 
 /** Shortest run that can be recorded between drying start and completion. */
 const MIN_DRYING_MS = 60 * 60 * 1000;
@@ -122,10 +122,10 @@ export async function createBatch(operatorId: string, input: CreateBatchInput) {
     await persistChain(batch.id, res, true);
   }
 
-  // With fees switched off there is nothing for the operator to collect, so the
-  // payment step is settled here as a recorded zero fee. They never see it.
-  const settings = await getSettings();
-  if (!settings.feesEnabled) {
+  // Where no fee is charged — globally off, or this hub does not collect —
+  // there is nothing for the operator to do, so the payment step is settled
+  // here as a recorded zero fee. They never see it.
+  if (!(await feesApplyAt(input.location))) {
     await waivePaymentForBatch(batchId);
   }
 
@@ -175,12 +175,11 @@ export async function advanceBatch(
   // AWAITING_PAYMENT is entered by setting the fee (see paymentService), not by
   // advancing — and drying stays locked until the money is confirmed.
   if (target === 'AWAITING_PAYMENT') {
-    const settings = await getSettings();
-    if (settings.feesEnabled) {
+    if (await feesApplyAt(batch.location)) {
       throw new AppError(400, 'Set the drying fee for this batch to continue');
     }
-    // Fees were switched off after this batch was registered: clear the step
-    // rather than stranding it.
+    // Fees were switched off, or this hub stopped collecting, after the batch
+    // was registered: clear the step rather than stranding it.
     await waivePaymentForBatch(batchId);
     return getBatch(batchId);
   }

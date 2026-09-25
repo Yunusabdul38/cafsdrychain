@@ -102,7 +102,7 @@ export default function ReportActions({ batches }: { batches: Batch[] }) {
       { label: "Drying method", w: 28, value: (b) => titleCase(b.dryingMethod) ?? DASH },
       { label: "Stage", w: 30, value: (b) => stageLabelFor(b) },
     ];
-    const xs = cols.reduce<number[]>((acc, c, i) => {
+    const xs = cols.reduce<number[]>((acc, _col, i) => {
       acc.push(i === 0 ? LEFT + 2 : acc[i - 1] + cols[i - 1].w);
       return acc;
     }, []);

@@ -1,18 +1,14 @@
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../middleware/error.js';
 import { logger } from '../lib/logger.js';
-import { paymentProvider, type PaymentState } from '../payments/index.js';
-import { getSettings } from './settingsService.js';
+import { getPaymentProvider, type PaymentState } from '../payments/index.js';
+import { feesApplyAt } from './settingsService.js';
 
 /** Naira are entered by operators; kobo are what we store. */
 const KOBO = 100;
 
 export function nairaToKobo(naira: number): number {
   return Math.round(naira * KOBO);
-}
-
-export function koboToNaira(kobo: number): number {
-  return kobo / KOBO;
 }
 
 /**
@@ -25,7 +21,7 @@ export function koboToNaira(kobo: number): number {
 export async function createPaymentForBatch(batchId: string, amountNaira: number) {
   const batch = await prisma.batch.findUnique({
     where: { batchId },
-    include: { payment: true },
+    include: { payment: true, operator: { select: { email: true, name: true } } },
   });
   if (!batch) throw new AppError(404, 'Batch not found');
 
@@ -36,29 +32,28 @@ export async function createPaymentForBatch(batchId: string, amountNaira: number
     throw new AppError(400, 'The drying fee can only be set before drying begins');
   }
 
-  const settings = await getSettings();
-  if (!settings.feesEnabled) {
-    throw new AppError(400, 'Drying fees are currently switched off by the administrator');
-  }
-  if (nairaToKobo(amountNaira) < settings.minimumFee) {
+  if (!(await feesApplyAt(batch.location))) {
     throw new AppError(
       400,
-      `The drying fee must be at least ${koboToNaira(settings.minimumFee)} naira`
+      `${batch.location} is not collecting drying fees. An administrator can turn them on for this hub.`
     );
   }
 
   const amount = nairaToKobo(amountNaira);
-  const { reference, checkoutUrl } = await paymentProvider.createLink({
+  const { reference, checkoutUrl } = await getPaymentProvider().createLink({
     batchId: batch.batchId,
     amount,
     currency: 'NGN',
     description: `Drying fee for ${batch.product} (${batch.batchId})`,
+    // The operator who took the batch in is the account the fee is billed to:
+    // it is the only verified identity attached to a batch.
+    payer: { email: batch.operator.email, name: batch.operator.name },
   });
 
   const data = {
     amount,
     currency: 'NGN',
-    provider: paymentProvider.name,
+    provider: getPaymentProvider().name,
     reference,
     checkoutUrl,
     status: 'PENDING' as const,
@@ -78,29 +73,26 @@ export async function createPaymentForBatch(batchId: string, amountNaira: number
   ]);
 
   logger.info(
-    { batchId: batch.batchId, reference, amount, provider: paymentProvider.name },
+    { batchId: batch.batchId, reference, amount, provider: getPaymentProvider().name },
     'Drying fee set — payment link issued'
   );
   return payment;
 }
 
-/** Public checkout lookup — returns only what the payer needs to see. */
 /**
  * Record a batch as free to dry. Kept as a real PAID payment of zero rather
  * than a lifecycle bypass, so "no fee was charged" is an auditable fact and the
  * drying gate stays the single place that decides.
  */
 export async function waivePaymentForBatch(batchId: string) {
-  const settings = await getSettings();
-  if (settings.feesEnabled) {
-    throw new AppError(400, 'Drying fees are switched on — set a fee for this batch');
-  }
-
   const batch = await prisma.batch.findUnique({
     where: { batchId },
     include: { payment: true },
   });
   if (!batch) throw new AppError(404, 'Batch not found');
+  if (await feesApplyAt(batch.location)) {
+    throw new AppError(400, 'Drying fees are switched on — set a fee for this batch');
+  }
   if (batch.payment?.status === 'PAID') return batch.payment;
   if (batch.stage !== 'REGISTERED' && batch.stage !== 'AWAITING_PAYMENT') {
     throw new AppError(400, 'This batch has already moved past the payment step');
@@ -129,22 +121,37 @@ export async function waivePaymentForBatch(batchId: string) {
   return payment;
 }
 
-export async function getPaymentByReference(reference: string) {
-  const payment = await prisma.payment.findUnique({
-    where: { reference },
-    include: { batch: { select: { batchId: true, product: true, location: true } } },
+/**
+ * Ask the gateway what really happened to a batch's fee, and settle it if it
+ * has resolved. The webhook is the normal path; this is the recovery one.
+ *
+ * Webhooks go missing for reasons outside this app — a redeploy mid-delivery, a
+ * rotated secret, exhausted retries — and without a way to re-ask, a batch whose
+ * fee was genuinely paid would sit at AWAITING_PAYMENT forever.
+ *
+ * Safe to call repeatedly: an already-settled payment is returned untouched.
+ */
+export async function reconcileBatchPayment(batchId: string) {
+  const batch = await prisma.batch.findUnique({
+    where: { batchId },
+    include: { payment: true },
   });
-  if (!payment) return null;
-  return {
-    reference: payment.reference,
-    amount: payment.amount,
-    currency: payment.currency,
-    status: payment.status,
-    provider: payment.provider,
-    paidAt: payment.paidAt,
-    batch: payment.batch,
-  };
+  if (!batch?.payment) throw new AppError(404, 'No payment has been set for this batch');
+
+  const payment = batch.payment;
+  // Only a paid fee is settled for good. FAILED is not terminal here: an
+  // expired checkout is recorded as failed, and a bank transfer the supplier
+  // had already started can still land afterwards — so re-asking has to stay
+  // possible, or that money would be taken with the batch never released.
+  if (payment.status === 'PAID') return payment;
+
+  const state = await getPaymentProvider().verify(payment.reference);
+  if (state === payment.status) return payment;
+
+  logger.info({ batchId, reference: payment.reference, state }, 'Payment reconciled from the gateway');
+  return (await settlePayment(payment.reference, state)) ?? payment;
 }
+
 
 export async function getPaymentForBatch(batchId: string) {
   const batch = await prisma.batch.findUnique({

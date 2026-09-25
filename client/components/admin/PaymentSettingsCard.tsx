@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Card, CardHeader } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Field";
-import Button from "@/components/ui/Button";
+import Switch from "@/components/ui/Switch";
 import { Spinner } from "@/components/dashboard/States";
 import { CheckIcon } from "@/components/icons";
 import { useSettings, useUpdateSettings, type AppSettings } from "@/lib/hooks/useAdmin";
-import { formatNaira } from "@/lib/hooks/usePayment";
 import { ApiError } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 /**
- * Admin control over drying fees: whether they are collected at all, and the
- * floor an operator may charge when they are.
+ * The master switch for drying fees.
+ *
+ * Off means nobody collects anywhere. On hands the decision to each hub, set
+ * on the locations page — so a pilot hub can charge while the rest stay free.
  */
 export default function PaymentSettingsCard() {
   const { data: settings, isLoading } = useSettings();
@@ -34,82 +34,63 @@ export default function PaymentSettingsCard() {
 
 function PaymentSettingsForm({ settings }: { settings: AppSettings }) {
   const update = useUpdateSettings();
-
-  const [feesEnabled, setFeesEnabled] = useState(settings.feesEnabled);
-  const [minimum, setMinimum] = useState(String(settings.minimumFee / 100));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const onSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // No optimistic flip. A bad connection would show the switch in its new
+  // position while the write was still in flight — or had failed — and the
+  // admin would walk away believing hubs were charging when they were not.
+  // The switch only moves once the server has confirmed the change.
+  const feesEnabled = settings.feesEnabled;
+  const busy = update.isPending;
+
+  const onToggle = async (next: boolean) => {
     setError(null);
     setSaved(false);
-    const naira = Number(minimum);
-    if (!Number.isInteger(naira) || naira < 0) {
-      setError("Enter a whole number of naira, or 0 for no minimum.");
-      return;
-    }
     try {
-      await update.mutateAsync({ feesEnabled, minimumFee: naira });
+      await update.mutateAsync({ feesEnabled: next });
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save the settings.");
+      setError(
+        err instanceof ApiError ? err.message : "Could not save. Check your connection and try again."
+      );
     }
   };
 
   return (
     <Card>
       <CardHeader title="Drying fees" />
-      <form onSubmit={onSave} className="space-y-5 p-5">
+      <div className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-sm font-medium text-brand-dark">Collect drying fees</p>
             <p className="mt-0.5 text-sm leading-relaxed text-muted">
               {feesEnabled
-                ? "Operators set a fee per batch and drying waits for payment."
-                : "Drying runs free. Operators start batches without any payment."}
+                ? "Each hub decides whether it charges. Drying waits for payment where it does."
+                : "Drying runs free everywhere. Operators start batches without any payment."}
             </p>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={feesEnabled}
-            aria-label="Collect drying fees"
-            onClick={() => setFeesEnabled((v) => !v)}
-            className={cn(
-              "relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
-              feesEnabled ? "bg-brand" : "bg-black/[0.15]"
-            )}
-          >
-            <span
-              className={cn(
-                "absolute top-1 h-5 w-5 rounded-full bg-white transition-all",
-                feesEnabled ? "left-6" : "left-1"
-              )}
+          <div className="flex shrink-0 items-center gap-2">
+            {busy && <Spinner className="h-4 w-4 animate-spin text-brand" />}
+            <Switch
+              checked={feesEnabled}
+              disabled={busy}
+              onChange={onToggle}
+              label="Collect drying fees"
             />
-          </button>
+          </div>
         </div>
 
-        <div className={cn(!feesEnabled && "opacity-50")}>
-          <Input
-            id="minimumFee"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={1}
-            label="Minimum fee (₦)"
-            placeholder="0"
-            value={minimum}
-            disabled={!feesEnabled}
-            onChange={(e) => setMinimum(e.target.value)}
-          />
-          <p className="mt-1.5 text-xs text-muted">
-            {Number(minimum) > 0
-              ? `Operators cannot charge less than ${formatNaira(Number(minimum) * 100)} per batch.`
-              : "No minimum. Operators may charge any amount above zero."}
+        {/* Confirmation of what actually landed in the database, not of the
+            click. Saying so explicitly is the point: the admin needs to know
+            the change is real before relying on it. */}
+        {saved && (
+          <p className="flex items-center gap-1.5 text-sm font-medium text-brand">
+            <CheckIcon className="h-4 w-4" />
+            Saved. Fees are now {feesEnabled ? "on" : "off"} across the network.
           </p>
-        </div>
+        )}
 
         {error && (
           <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -117,17 +98,16 @@ function PaymentSettingsForm({ settings }: { settings: AppSettings }) {
           </p>
         )}
 
-        <div className="flex items-center gap-3">
-          <Button type="submit" disabled={update.isPending}>
-            {update.isPending ? "Saving…" : "Save changes"}
-          </Button>
-          {saved && (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-brand">
-              <CheckIcon className="h-4 w-4" /> Saved
-            </span>
-          )}
-        </div>
-      </form>
+        {feesEnabled && (
+          <p className="rounded-2xl bg-black/[0.02] px-4 py-3 text-sm leading-relaxed text-muted">
+            Choose which hubs collect a fee on the{" "}
+            <Link href="/admin/locations" className="font-medium text-brand hover:underline">
+              locations page
+            </Link>
+            . A hub with fees off starts drying immediately, with no payment step.
+          </p>
+        )}
+      </div>
     </Card>
   );
 }

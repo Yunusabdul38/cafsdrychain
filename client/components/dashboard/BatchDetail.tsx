@@ -7,7 +7,7 @@ import PageHeader from "@/components/dashboard/PageHeader";
 import StageProgress from "@/components/dashboard/StageProgress";
 import Timeline from "@/components/dashboard/Timeline";
 import { LinkButton, buttonClass } from "@/components/ui/Button";
-import { nextAction } from "@/lib/lifecycle";
+import { actionForBatch } from "@/lib/lifecycle";
 import { formatDate, formatDateTime, titleCase } from "@/lib/utils";
 import { ArrowRightIcon, DownloadIcon } from "@/components/icons";
 
@@ -20,7 +20,7 @@ export default function BatchDetail({
   basePath: string;
   canAct?: boolean;
 }) {
-  const action = nextAction(batch.stage);
+  const action = actionForBatch(batch);
 
   const handleDownloadQr = () => {
     const canvas = document.createElement("canvas");
