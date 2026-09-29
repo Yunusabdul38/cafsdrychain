@@ -44,11 +44,16 @@ export default function BatchList({
                   <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
                 </div>
                 <p className="mt-1 font-mono text-xs text-muted">{b.id}</p>
+                {/* Keep in step with the desktop table below: a batch should
+                    not read differently depending on the screen. */}
                 <p className="mt-1 text-xs text-muted">
                   {titleCase(b.source)} · {b.finalWeight ?? b.freshWeight} kg{" "}
                   {b.finalWeight !== undefined ? "dried" : "fresh"}
                   {showOperator ? ` · ${b.operator}` : ""}
                   {showLocation ? ` · ${titleCase(b.location)}` : ""}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Entered {formatDate(b.entryDate)}
                 </p>
               </div>
               <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
@@ -58,8 +63,8 @@ export default function BatchList({
       </ul>
 
       {/* Desktop: table */}
-      <div className="hidden overflow-hidden rounded-2xl border border-black/[0.08] bg-white md:block">
-        <table className="w-full text-left text-sm">
+      <div className="hidden overflow-x-auto rounded-2xl border border-black/[0.08] bg-white md:block">
+        <table className="w-full min-w-[46rem] text-left text-sm">
           <thead>
             <tr className="border-b border-black/[0.06] text-xs uppercase tracking-wide text-muted">
               <th className="px-5 py-3 font-medium">Batch ID</th>

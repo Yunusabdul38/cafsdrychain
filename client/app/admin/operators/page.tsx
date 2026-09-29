@@ -233,7 +233,7 @@ export default function AdminOperators() {
           ) : (
             <>
               {/* Mobile cards */}
-              <ul className="space-y-3 md:hidden">
+              <ul className="space-y-3 lg:hidden">
                 {displayedUsers.map((u) => (
                   <li key={u.id}>
                     <Card className="p-4">
@@ -249,6 +249,16 @@ export default function AdminOperators() {
                         </div>
                         <StatusPill status={u.status} />
                       </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-black/[0.04] pt-3 text-xs text-muted">
+                        <span className="font-mono">
+                          {u.wallet
+                            ? `${u.wallet.address.slice(0, 6)}…${u.wallet.address.slice(-4)}`
+                            : "No wallet"}
+                        </span>
+                        <span aria-hidden>·</span>
+                        <span>Joined {formatDate(u.createdAt)}</span>
+                      </div>
+
                       <div className="mt-3 flex items-center justify-between border-t border-black/[0.04] pt-3">
                         <div className="flex items-center gap-2 text-xs text-muted">
                           <Badge className="bg-sky-soft text-sky">{roleLabel[u.role.toLowerCase()] ?? u.role}</Badge>
@@ -299,7 +309,7 @@ export default function AdminOperators() {
               </ul>
 
               {/* Desktop table */}
-              <div className="hidden overflow-visible rounded-2xl border border-black/[0.08] bg-white md:block">
+              <div className="hidden overflow-visible rounded-2xl border border-black/[0.08] bg-white lg:block">
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-black/[0.06] text-xs uppercase tracking-wide text-muted">

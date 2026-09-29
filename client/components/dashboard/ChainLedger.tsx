@@ -96,8 +96,8 @@ export default function ChainLedger({ records }: { records: LedgerRecord[] }) {
       </ul>
 
       {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-2xl border border-black/[0.08] bg-white md:block">
-        <table className="w-full text-left text-sm">
+      <div className="hidden overflow-x-auto rounded-2xl border border-black/[0.08] bg-white md:block">
+        <table className="w-full min-w-[46rem] text-left text-sm">
           <thead>
             <tr className="border-b border-black/[0.06] text-xs uppercase tracking-wide text-muted">
               <th className="px-5 py-3 font-medium">Tx hash</th>

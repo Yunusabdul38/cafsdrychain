@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/dashboard/States";
 import { LinkIcon, ExternalLinkIcon } from "@/components/icons";
 import { useRelayerWallet } from "@/lib/hooks/useAdmin";
-import { cn, shortHash } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const TONE = {
   HEALTHY: { badge: "bg-mint text-brand", dot: "bg-brand", label: "Healthy" },
@@ -44,8 +44,8 @@ export default function RelayerWalletCard() {
             const pct = Math.min(100, (w.balance / (w.lowThreshold * 4)) * 100);
             return (
               <>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                  <div className="min-w-0">
                     <p className="text-3xl font-semibold tracking-tight text-brand-dark">
                       {w.balance.toFixed(5)}{" "}
                       <span className="text-base font-medium text-muted">{w.symbol}</span>
@@ -84,12 +84,14 @@ export default function RelayerWalletCard() {
                   </div>
                 )}
 
-                <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-black/[0.08] bg-black/[0.02] px-4 py-3">
+                <div className="mt-4 flex flex-col gap-2 rounded-2xl border border-black/[0.08] bg-black/[0.02] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
                       Wallet address
                     </p>
-                    <p className="mt-0.5 truncate font-mono text-xs text-brand-dark">
+                    {/* break-all, not truncate: this is the address funds are
+                        sent to, and a truncated one cannot be checked. */}
+                    <p className="mt-0.5 break-all font-mono text-xs text-brand-dark">
                       {w.address}
                     </p>
                   </div>
@@ -98,10 +100,10 @@ export default function RelayerWalletCard() {
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Opens the wallet on the block explorer in a new tab"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-black/[0.03] px-3 py-1 text-[11px] font-medium text-muted transition-colors hover:bg-mint hover:text-brand"
+                    className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-black/[0.03] px-3 py-1 text-[11px] font-medium text-muted transition-colors hover:bg-mint hover:text-brand"
                   >
                     <LinkIcon className="h-3 w-3" />
-                    {shortHash(w.address)}
+                    Explorer
                     <ExternalLinkIcon className="h-3 w-3" />
                   </a>
                 </div>

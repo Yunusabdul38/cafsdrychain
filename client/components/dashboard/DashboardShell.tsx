@@ -13,7 +13,7 @@ import IdleWarning from "@/components/dashboard/IdleWarning";
 import { useLogout } from "@/lib/hooks/useAuth";
 import Logo from "@/components/ui/Logo";
 import { LoadingState } from "@/components/dashboard/States";
-import { LogoutIcon, PlusIcon } from "@/components/icons";
+import { LogoutIcon, MoreVerticalIcon, PlusIcon } from "@/components/icons";
 
 const SIDEBAR_STORAGE_KEY = "sidebar-collapsed";
 
@@ -48,6 +48,14 @@ export default function DashboardShell({
     });
   };
 
+  // The overflow sheet closes on navigation. Both of these must stay above the
+  // auth guard's early return below: hooks after a conditional return change
+  // the hook count between renders and React throws.
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
   // Auth + role guard.
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -75,6 +83,9 @@ export default function DashboardShell({
     pathname === href || (href !== meta.home && pathname.startsWith(href + "/"));
 
   const mobileItems = nav.filter((n) => n.mobile);
+  // Sidebar items the bottom bar has no room for. They go in the More sheet,
+  // along with logout — on a phone the sidebar that carries it is gone.
+  const overflowItems = nav.filter((n) => !n.mobile);
 
   return (
     <div className="min-h-screen bg-[#f6f8f4]">
@@ -209,6 +220,50 @@ export default function DashboardShell({
         </main>
       </div>
 
+      {moreOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/20 lg:hidden"
+            onClick={() => setMoreOpen(false)}
+            aria-hidden
+          />
+          <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-black/[0.08] bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl lg:hidden">
+            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-black/[0.12]" />
+            <ul className="p-3">
+              {overflowItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+                        isActive(item.href)
+                          ? "bg-mint text-brand"
+                          : "text-brand-dark hover:bg-black/[0.03]"
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+              <li className="mt-1 border-t border-black/[0.06] pt-1">
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-brand-dark transition-colors hover:bg-black/[0.03]"
+                >
+                  <LogoutIcon className="h-5 w-5" />
+                  Log out
+                </button>
+              </li>
+            </ul>
+          </div>
+        </>
+      )}
+
       {/* Mobile bottom nav (app-style) */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.08] bg-white lg:hidden">
         <ul className="mx-auto flex max-w-md items-stretch justify-around px-2">
@@ -243,6 +298,25 @@ export default function DashboardShell({
               </li>
             );
           })}
+
+          {overflowItems.length > 0 && (
+            <li className="flex-1">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-expanded={moreOpen}
+                className={cn(
+                  "flex w-full flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",
+                  moreOpen || overflowItems.some((i) => isActive(i.href))
+                    ? "text-brand"
+                    : "text-muted"
+                )}
+              >
+                <MoreVerticalIcon className="h-[22px] w-[22px]" />
+                More
+              </button>
+            </li>
+          )}
         </ul>
         <div className="h-[env(safe-area-inset-bottom)]" />
       </nav>
