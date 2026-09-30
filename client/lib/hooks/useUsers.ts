@@ -28,6 +28,9 @@ function toUiUser(u: ApiUser): ApiUser {
   return { ...u, role: String(u.role).toLowerCase() as Role };
 }
 
+/** The account always exists after a create; the invitation email may not have gone. */
+export type CreatedUser = { user: ApiUser; inviteSent: boolean; inviteError: string | null };
+
 export function useUsers() {
   return useQuery({
     queryKey: ["users"],
@@ -47,7 +50,7 @@ export function useCreateUser() {
       role: Role;
       location: string;
     }) =>
-      api.post<{ user: ApiUser }>("/api/users", input),
+      api.post<CreatedUser>("/api/users", input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });
 }

@@ -6,7 +6,8 @@ import { StageBadge, VerifiedBadge } from "@/components/ui/Badge";
 import PageHeader from "@/components/dashboard/PageHeader";
 import StageProgress from "@/components/dashboard/StageProgress";
 import Timeline from "@/components/dashboard/Timeline";
-import { LinkButton, buttonClass } from "@/components/ui/Button";
+import Button, { LinkButton, buttonClass } from "@/components/ui/Button";
+import { useReconcileChain } from "@/lib/hooks/useBatches";
 import { actionForBatch } from "@/lib/lifecycle";
 import { formatDate, formatDateTime, titleCase } from "@/lib/utils";
 import { ArrowRightIcon, DownloadIcon } from "@/components/icons";
@@ -21,6 +22,11 @@ export default function BatchDetail({
   canAct?: boolean;
 }) {
   const action = actionForBatch(batch);
+  const reconcile = useReconcileChain(batch.id);
+  // PENDING is a write still settling; FAILED is one that did not land and will
+  // not retry itself until the sweep comes round. Only the latter is worth
+  // putting in front of someone.
+  const chainBehind = batch.chainStatus === "FAILED";
 
   const handleDownloadQr = () => {
     const canvas = document.createElement("canvas");
@@ -131,6 +137,37 @@ export default function BatchDetail({
         <StageBadge stage={batch.stage} paid={batch.payment?.status === "PAID"} />
         {batch.verified && <VerifiedBadge />}
       </div>
+
+      {chainBehind && (
+        <Card className="mb-6 border-amber-200 bg-amber-50 p-5">
+          <p className="text-sm font-semibold text-amber-900">
+            This batch is not fully recorded on the blockchain
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-amber-800">
+            The details above are saved, but a blockchain write did not go
+            through — so this batch cannot be publicly verified yet. Nothing is
+            lost: retrying writes only the steps the chain is missing.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button
+              size="sm"
+              variant="dark"
+              disabled={reconcile.isPending}
+              onClick={() => reconcile.mutate()}
+            >
+              {reconcile.isPending ? "Writing to blockchain…" : "Retry now"}
+            </Button>
+            {reconcile.isError && (
+              <span className="text-xs font-medium text-red-700">
+                Still could not write. It will be retried automatically.
+              </span>
+            )}
+            {reconcile.isSuccess && (
+              <span className="text-xs font-medium text-brand">Recorded.</span>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Progress */}
       <Card className="mb-6 p-5">

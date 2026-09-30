@@ -48,13 +48,13 @@ export default function DashboardShell({
     });
   };
 
-  // The overflow sheet closes on navigation. Both of these must stay above the
-  // auth guard's early return below: hooks after a conditional return change
-  // the hook count between renders and React throws.
-  const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => {
-    setMoreOpen(false);
-  }, [pathname]);
+  // The overflow sheet remembers the page it was opened on and is open only
+  // while that page is showing, so any navigation closes it — links, the Back
+  // button — without an effect. Keep this above the auth guard's early return:
+  // hooks after a conditional return change the hook count and React throws.
+  const [moreOpenOn, setMoreOpenOn] = useState<string | null>(null);
+  const moreOpen = moreOpenOn === pathname;
+  const closeMore = () => setMoreOpenOn(null);
 
   // Auth + role guard.
   useEffect(() => {
@@ -224,7 +224,7 @@ export default function DashboardShell({
         <>
           <div
             className="fixed inset-0 z-40 bg-black/20 lg:hidden"
-            onClick={() => setMoreOpen(false)}
+            onClick={closeMore}
             aria-hidden
           />
           <div className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border-t border-black/[0.08] bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl lg:hidden">
@@ -236,6 +236,7 @@ export default function DashboardShell({
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={closeMore}
                       className={cn(
                         "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
                         isActive(item.href)
@@ -303,7 +304,7 @@ export default function DashboardShell({
             <li className="flex-1">
               <button
                 type="button"
-                onClick={() => setMoreOpen((v) => !v)}
+                onClick={() => setMoreOpenOn(moreOpen ? null : pathname)}
                 aria-expanded={moreOpen}
                 className={cn(
                   "flex w-full flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors",

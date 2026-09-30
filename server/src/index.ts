@@ -2,20 +2,21 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { pinoHttp } from 'pino-http';
+import { httpLogger } from './lib/httpLogger.js';
 import { env, corsOrigins } from './env.js';
 import { logger } from './lib/logger.js';
 import { globalLimiter } from './middleware/rateLimit.js';
 import { errorHandler, notFound } from './middleware/error.js';
 import { ensureWalletCounter } from './services/walletService.js';
-import { chainEnabled } from './chain/client.js';
+import { chainEnabled, checkRpc } from './chain/client.js';
+import { explorerUrl } from './chain/explorer.js';
+import { startChainSweeper } from './chain/sweeper.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import batchRoutes from './routes/batches.js';
 import verifyRoutes from './routes/verify.js';
 import locationRoutes from './routes/locations.js';
 import paymentRoutes, { batchPaymentRoutes } from './routes/payments.js';
-import contactRoutes from './routes/contact.js';
 import adminRoutes from './routes/admin.js';
 
 const app = express();
@@ -48,16 +49,21 @@ app.use(
     credentials: true,
   })
 );
+app.use(httpLogger);
 // Webhooks are mounted before the JSON parser: signature verification needs the
 // exact bytes the gateway sent, which a parse-and-reserialise round trip loses.
 app.use('/api/payments', paymentRoutes);
 
 app.use(express.json({ limit: '100kb' })); // bound body size
 app.use(cookieParser());
-app.use(pinoHttp({ logger }));
 app.use(globalLimiter);
 
 // --- Routes --------------------------------------------------------------
+// Public deployment settings the site reads at runtime (see client/lib/config.ts).
+app.get('/api/config', (_req, res) => {
+  res.json({ chainId: env.CHAIN_ID, explorerUrl, hideMoisture: env.HIDE_MOISTURE });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', chain: chainEnabled() ? 'enabled' : 'off', timestamp: new Date() });
 });
@@ -68,7 +74,6 @@ app.use('/api/batches', batchPaymentRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/verify', verifyRoutes);
 app.use('/api/locations', locationRoutes);
-app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use(notFound);
@@ -87,6 +92,10 @@ async function start() {
   } catch (err) {
     logger.error({ err }, 'Failed to initialize wallet counter — DB schema may need pushing');
   }
+
+  await checkRpc();
+  // Catches up any batch whose chain write failed and nothing has retried.
+  startChainSweeper();
 }
 
 start().catch((err) => {

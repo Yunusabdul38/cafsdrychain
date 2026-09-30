@@ -17,41 +17,7 @@ The relayer wallet `0x486E22Ec9CDba5Ed7D082592F8C033e5f52C69C6` sponsors all gas
 
 ---
 
-## 1. Two retired stages must be deleted on the next fresh deploy
-
-**Status:** DONE for the upgrade path. **OPEN for a fresh redeploy.**
-
-Both dispatch and storage are gone from the product. The lifecycle is now
-`Registered → DryingStarted → DryingCompleted → Delivered`, and
-`updateLogistics` accepts nothing but `Delivered`.
-
-The two enum members survive as `InStorage_Retired` (3) and `InTransit_Retired`
-(4) **only because these were upgrades**. Enum values are stored as their
-position, so deleting either would renumber `Delivered` from 5 and make every
-batch already delivered on chain decode as something else. Keeping the slots is
-the price of not breaking existing records.
-
-### On the next fresh deploy, delete them properly
-
-A brand new proxy starts with no batches, so there is no historical state to
-protect and renumbering is harmless. At that point:
-
-1. Delete both retired members from `BatchState`, leaving
-   `Registered, DryingStarted, DryingCompleted, Delivered`.
-2. Drop their branches from `_assertTransition` and `canTransition` — they exist
-   only so a legacy batch stuck at storage or dispatch could still finish.
-3. Update `relayLogistics` in `server/src/chain/relayer.ts`: its state argument
-   is pinned to `5` for delivered. **`Delivered` becomes 3.** This is the step
-   that breaks silently if forgotten.
-4. Remove the tests pinning the retired slots
-   (`test_RevertWhen_WritingRetiredInTransit`,
-   `test_RevertWhen_WritingRetiredStorage`,
-   `test_RetiredStageKeepsDeliveredAtPositionFive`, and the legacy-recovery
-   transition tests).
-
-Do **not** do any of this as an upgrade to the current proxy.
-
-## 2. The payment stage is entirely off chain
+## 1. The payment stage is entirely off chain
 
 **Status:** DECIDED — payment stays off chain. Fees are commercial terms, not
 provenance, and a public ledger is the wrong place for them. Revisit only if a
@@ -68,58 +34,7 @@ public traceability record *should* expose commercial terms.
 If payment facts move into the hashed metadata, that changes `hashBatch()` in
 `server/src/services/batchService.ts` and therefore every future `metadataHash`.
 
-## 3. Fields the hash covers have changed
-
-**Status:** app-side only; no contract change needed, but worth knowing.
-
-`hashBatch()` now includes `category` and `dryingMethod`. The hash is recomputed
-and written on every stage advance, so old and new batches stay verifiable —
-`verifyOnChain` compares the current stored hash against the chain, not a
-historical one.
-
-`supplier` is still in the hash formula but is no longer collected, so it hashes
-as `null` for new batches. Left in deliberately: churning the formula is riskier
-than one dead field.
-
-## 4. Schema cleanup for the mainnet cut-over
-
-**Status:** deferred on purpose. Everything here is dead weight the app no
-longer reads, kept only because Railway deploys with `npx prisma db push`
-(see `server/railway.json`), which refuses a destructive change and would fail
-the deploy.
-
-The plan is to do all of it in one pass when moving to mainnet, where the
-database is recreated from scratch and migrations are re-run — so nothing below
-needs a careful data migration, only deleting.
-
-### Columns to drop
-
-| Column | Why it is dead |
-| --- | --- |
-| `Batch.supplier` | no longer collected; still in the `hashBatch` formula, hashing as `null` |
-| `Batch.transport` | no longer collected |
-| `Batch.packaging` | no longer collected |
-| `Batch.storageLocation` | the storage stage is retired; legacy rows hold values nothing reads |
-| `User.mustChangePassword` | invitation links replaced the emailed-password flow |
-| `AppSettings.minimumFee` | replaced by the per-hub `Location.feesEnabled` toggle |
-
-### Rename
-
-`Batch.entryDate` is mapped to the physical column `deliveryDate` via `@map`.
-`db push` treats a rename as drop-plus-add, so the `@map` stays until the
-cut-over. Drop the `@map` and let the column take its real name.
-
-### Also at the cut-over
-
-- Delete the retired `BatchState` enum members (section 1) — that is the same
-  fresh-deploy pass.
-- Switch the Railway start command off `db push` to `prisma migrate deploy`, so
-  schema changes are versioned from then on rather than inferred.
-- Re-check `hashBatch()`: dropping `supplier` changes the hash formula. Safe by
-  itself — `verifyOnChain` compares the *stored* hash against the chain rather
-  than recomputing — but it is the moment to make the formula match reality.
-
-## 5. Event args are not indexed
+## 2. Event args are not indexed
 
 **Status:** DONE — every event now carries `bytes32 indexed batchIdKey`
 (the keccak of the batch id) *alongside* the readable `string batchId`, so logs
@@ -129,17 +44,40 @@ exposed as a pure view so clients can build the filter.
 Still unverified: whether Basescan's UI honours a topic filter in a shareable
 URL. The indexed arg is the prerequisite either way, and costs nothing.
 
-Note this is **forward-only**: logs written before the upgrade carry the old
-event signature and cannot be re-emitted, so the two existing batches stay
-unfilterable.
+The forward-only caveat that used to sit here is moot: mainnet starts with no
+prior logs, so every event carries the indexed key.
 
-## 6. Explorer URL is hardcoded in three places
+## Done in the mainnet cut-over
 
-`https://sepolia.basescan.org` appears in `Timeline.tsx`, `ChainLedger.tsx` and
-`RelayerWalletCard.tsx`. Pull into one constant before changing networks.
+Everything below was deferred until the chain and database could be recreated
+from scratch, and was cleared in one pass when they were.
 
+**Retired enum members deleted.** `BatchState` is now
+`Registered, DryingStarted, DryingCompleted, Delivered` with no gaps, so
+`Delivered` moved from 5 to 3. `relayLogistics` was updated to match — the step
+this file warned would break silently. It does not any more: the state argument
+is typed to the single value it writes, so a mismatch is a compile error.
+`test_StatePositionsMatchTheRelayer` pins the numbering.
 
----
+**Dead columns dropped.** `Batch.supplier`, `.transport`, `.packaging`,
+`.storageLocation`, `User.mustChangePassword` and `AppSettings.minimumFee` are
+gone, and `entryDate` lost its `@map("deliveryDate")` so the column takes its
+real name. `supplier` also left `hashBatch()`, which it could not do while
+older hashes had to stay reproducible.
+
+**Retired DB stages dropped.** `BatchStage` no longer carries `STORED` or
+`IN_TRANSIT`, and the labels, badges, adapters and lifecycle entries that
+existed only for them went with it.
+
+**Migrations replaced `db push`.** `prisma/migrations/0_init` is a single
+baseline generated from the cleaned schema, and Railway now runs
+`prisma migrate deploy`. Schema changes are versioned from here rather than
+inferred, and a destructive change no longer silently fails a deploy.
+
+**Explorer URLs centralised.** The server derives the explorer from `CHAIN_ID`
+and serves it at `/api/config`; `client/lib/explorer.ts` builds links from that,
+so they can never point at a different chain from the records. They were written out
+at four call sites, all pinned to Sepolia.
 
 ## What the hardening upgrade added (2026-09-03)
 
@@ -176,11 +114,35 @@ the broadcaster holds admin, and verifies state survived.
 
 ## Deployment log
 
+### Base Sepolia (testnet, retired at the mainnet cut-over)
+
 | Date | Implementation | What changed |
 | --- | --- | --- |
 | 2026-09-03 | `0x5b33B2f2379F357d014869F23f32A36354e06CB0` | Lifecycle enforcement, input validation, weight guard, indexed events, admin lock-out. `InTransit` retired. |
 | 2026-09-09 | `0x9BDf6252AaFA88CCa7D010e08673a76F27E6582d` | `InStorage` retired: `DryingCompleted → Delivered` is now the only path to delivery, with a legacy escape for batches sitting at storage or dispatch. |
 
-The proxy is unchanged throughout and all 17 batches survived both upgrades.
+The proxy was unchanged throughout and all 17 batches survived both upgrades.
 Both implementations are verified — always pass `--verify`, or the explorer
 renders this contract's event logs as raw hex.
+
+### Base Sepolia (fresh stack, 2026-09-29)
+
+Redeployed from scratch to rehearse the mainnet cut-over: no upgrade, no
+carried-over state, and the retired enum members finally gone.
+
+| Contract | Address |
+| --- | --- |
+| BatchRegistry (proxy) | `0xBaFE3734ABAABb84AaF2D949d8EcFb3f4774dAD4` |
+| BatchRegistry (impl) | `0x3D8715bd77d5F83804431708889FEee355b7F0A1` |
+| RoleManager (proxy) | `0x592a5e38962Ff54046Fd241C65FD03f44897B03b` |
+| RoleManager (impl) | `0x4AD83678E2648a29fFE5602827706C205c79B4A0` |
+| DryChainForwarder | `0xA0E37021dF0322C2b9D0ab06a71116C33FEC8273` |
+
+`Delivered` is position 3 here, verified on chain: `canTransition(…, 3)` answers
+and `4` reverts as out of range. The older Sepolia proxy above is abandoned, not
+upgraded — its batches stay readable at their own address.
+
+### Base mainnet
+
+Deployed fresh, with no upgrade history to preserve. Record the addresses here
+once `DeployCAFS` has run.

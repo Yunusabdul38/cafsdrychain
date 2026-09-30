@@ -8,7 +8,7 @@ import Button, { LinkButton } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import PageHeader from "@/components/dashboard/PageHeader";
 import { CheckIcon, MailIcon, LinkIcon, UsersIcon } from "@/components/icons";
-import { useCreateUser, type ApiUser } from "@/lib/hooks/useUsers";
+import { useCreateUser, type CreatedUser } from "@/lib/hooks/useUsers";
 import { useLocations } from "@/lib/hooks/useLocations";
 import Modal from "@/components/ui/Modal";
 import { ApiError } from "@/lib/api";
@@ -43,7 +43,7 @@ export default function AddUserForm() {
   const location = chosenLocation || locations[0]?.name || "";
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
-  const [result, setResult] = useState<{ user: ApiUser } | null>(null);
+  const [result, setResult] = useState<CreatedUser | null>(null);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const resendInvite = useResendInvite();
   const updateStatus = useUpdateUserStatus();
@@ -119,7 +119,10 @@ export default function AddUserForm() {
             <span className="font-medium text-brand-dark">
               {roles.find((r) => r.id === role)?.label}
             </span>
-            . They have been emailed an invitation to set their own password.
+            .{" "}
+            {result.inviteSent
+              ? "They have been emailed an invitation to set their own password."
+              : "The invitation email did not go out."}
           </p>
 
           {result.user.wallet && (
@@ -133,14 +136,25 @@ export default function AddUserForm() {
             </div>
           )}
 
-          <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-brand/20 bg-mint/30 px-4 py-3 text-sm text-brand-dark text-left">
-            <MailIcon className="h-5 w-5 shrink-0 text-brand mt-0.5" />
-            <span>
-              An invitation was sent to{" "}
-              <span className="font-semibold">{result.user.email}</span>. The link
-              works once and expires in 72 hours.
-            </span>
-          </div>
+          {result.inviteSent ? (
+            <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-brand/20 bg-mint/30 px-4 py-3 text-sm text-brand-dark text-left">
+              <MailIcon className="h-5 w-5 shrink-0 text-brand mt-0.5" />
+              <span>
+                An invitation was sent to{" "}
+                <span className="font-semibold">{result.user.email}</span>. The link
+                works once and expires in 72 hours.
+              </span>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 text-left">
+              <MailIcon className="h-5 w-5 shrink-0 mt-0.5" />
+              <span>
+                {result.inviteError ?? "The invitation email could not be sent."}{" "}
+                The account is saved, use <span className="font-semibold">Resend invitation</span>{" "}
+                on the users page once email is working.
+              </span>
+            </div>
+          )}
 
           <div className="mt-6 flex flex-col gap-2 sm:flex-row">
             <LinkButton href="/admin/operators" full variant="dark">

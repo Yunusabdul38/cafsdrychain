@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useExplorer } from "@/lib/explorer";
 import { Badge } from "@/components/ui/Badge";
 import { Select } from "@/components/ui/Field";
 import { relativeTime } from "@/lib/utils";
@@ -14,8 +15,6 @@ export type LedgerRecord = {
   location: string;
 };
 
-const EXPLORER_TX = "https://sepolia.basescan.org/tx/";
-
 function statusBadge(status: LedgerRecord["status"]) {
   if (status === "confirmed")
     return <Badge className="bg-mint text-brand" dot="bg-brand">Confirmed</Badge>;
@@ -25,11 +24,12 @@ function statusBadge(status: LedgerRecord["status"]) {
 }
 
 function TxLink({ hash }: { hash: string }) {
+  const { txUrl } = useExplorer();
   if (!hash) return <span className="text-muted">—</span>;
   const short = `${hash.slice(0, 10)}…${hash.slice(-6)}`;
   return (
     <a
-      href={`${EXPLORER_TX}${hash}`}
+      href={txUrl(hash)}
       target="_blank"
       rel="noopener noreferrer"
       className="font-mono text-[13px] text-brand hover:underline"

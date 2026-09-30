@@ -29,8 +29,6 @@ const stageStyles: Record<BatchStage, string> = {
   registered: "bg-sky-soft text-sky",
   drying: "bg-[#FFF3E0] text-[#B4740B]",
   dried: "bg-mint text-brand",
-  stored: "bg-[#EEF0FF] text-[#4457C7]",
-  "in-transit": "bg-[#FDEEE4] text-[#C4622A]",
   "awaiting-payment": "bg-[#FFF3E0] text-[#B4740B]",
   delivered: "bg-brand-dark text-white",
 };

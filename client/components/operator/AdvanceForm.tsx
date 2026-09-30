@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useExplorer } from "@/lib/explorer";
 import type { Batch } from "@/lib/types";
 import { nextAction } from "@/lib/lifecycle";
+import { useAppConfig } from "@/lib/config";
 import PaymentStep from "@/components/operator/PaymentStep";
 import { STAGE_LABEL } from "@/lib/stages";
 import { useAdvanceBatch, type ApiBatch } from "@/lib/hooks/useBatches";
@@ -28,8 +30,6 @@ const UI_TO_API_STAGE: Record<Batch["stage"], string> = {
   "awaiting-payment": "AWAITING_PAYMENT",
   drying: "DRYING",
   dried: "DRIED",
-  stored: "STORED",
-  "in-transit": "IN_TRANSIT",
   delivered: "DELIVERED",
 };
 
@@ -43,16 +43,18 @@ export default function AdvanceForm({
   const action = nextAction(batch.stage);
   const paid = batch.payment?.status === "PAID";
 
-  // Pricing and collecting the drying fee is its own flow, not a stage form.
   const advance = useAdvanceBatch(batch.id);
+  const { txUrl } = useExplorer();
+  const hideMoisture = useAppConfig().data?.hideMoisture === true;
   const qc = useQueryClient();
   const [done, setDone] = useState<ApiBatch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [alreadyDone, setAlreadyDone] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
-  // Every hook above runs unconditionally: this early return has to sit below
-  // them, or the hook order changes when a batch moves past the payment stage.
+  // Pricing and collecting the drying fee is its own flow, not a stage form.
+  // Every hook above must run before this return, or the hook order changes
+  // when a batch moves past the payment stage.
   if (batch.stage === "registered" || (batch.stage === "awaiting-payment" && !paid)) {
     return <PaymentStep batch={batch} basePath={basePath} />;
   }
@@ -105,7 +107,7 @@ export default function AdvanceForm({
           </div>
           {done.txHash && (
             <a
-              href={`https://sepolia.basescan.org/tx/${done.txHash}`}
+              href={txUrl(done.txHash)}
               target="_blank"
               rel="noreferrer"
               className="mt-3 flex items-center justify-center gap-1.5 text-xs font-medium text-muted transition-colors hover:text-brand"
@@ -161,7 +163,9 @@ export default function AdvanceForm({
     };
     const num = (k: string) => {
       const v = fd.get(k);
-      return v ? Number(v) : undefined;
+      if (!v) return undefined;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : undefined;
     };
 
     // Every free-text field the operator can fill on this step, kept together.
@@ -186,11 +190,30 @@ export default function AdvanceForm({
       dryingEnd: str("end"),
       dryingMethod: str("method"),
       finalWeight: num("final"),
-      moisture: num("moisture"),
+      moisture: hideMoisture ? undefined : num("moisture"),
       quality: str("quality"),
       destination: str("destination"),
       notes: composeNote(),
     };
+    // Moisture is a percentage of the produce's weight, so anything outside
+    // 0-100 is a mis-key. The browser's min/max stops most of it and the server
+    // rejects the rest, but neither says so next to the field.
+    if (payload.moisture !== undefined && (payload.moisture < 0 || payload.moisture > 100)) {
+      setFieldErrors({ moisture: ["Moisture is a percentage — enter a value between 0 and 100."] });
+      return;
+    }
+    if (
+      payload.finalWeight !== undefined &&
+      payload.finalWeight > batch.freshWeight
+    ) {
+      setFieldErrors({
+        finalWeight: [
+          `Dried weight cannot exceed the ${batch.freshWeight} kg taken in — drying removes water.`,
+        ],
+      });
+      return;
+    }
+
     // Drop undefined keys so the API only receives provided fields.
     const clean = Object.fromEntries(
       Object.entries(payload).filter(([, v]) => v !== undefined)
@@ -278,6 +301,11 @@ function Fields({
   /** Bounds the completion time: drying must finish after it began. */
   dryingStart?: string;
 }) {
+  // Shown unless the server has said otherwise: were the config ever to fail to
+  // load, a reading can still be taken, and the server discards it when
+  // collection is off.
+  const hideMoisture = useAppConfig().data?.hideMoisture === true;
+
   // Build an ISO 8601 string in the user's LOCAL timezone (e.g. "2026-08-01T15:55:00+01:00")
   // so the pre-filled time matches the operator's wall clock, not UTC.
   const localNow = (() => {
@@ -353,16 +381,22 @@ function Fields({
             required
             error={errors.finalWeight?.[0]}
           />
-          <Input
-            id="moisture"
-            name="moisture"
-            type="number"
-            step="any"
-            label="Moisture (%)"
-            placeholder="e.g. 12"
-            required
-            error={errors.moisture?.[0]}
-          />
+          {!hideMoisture && (
+            <Input
+              id="moisture"
+              name="moisture"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={100}
+              step={0.1}
+              label="Moisture (%)"
+              placeholder="e.g. 12"
+              hint="0 – 100"
+              required
+              error={errors.moisture?.[0]}
+            />
+          )}
         </div>
         <Select
           id="quality"
@@ -387,7 +421,7 @@ function Fields({
     );
   }
 
-  if (stage === "dried" || stage === "stored") {
+  if (stage === "dried") {
     return (
       <>
         <Input

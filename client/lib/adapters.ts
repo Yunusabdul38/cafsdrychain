@@ -6,8 +6,6 @@ const STAGE_MAP: Record<ApiStage, BatchStage> = {
   AWAITING_PAYMENT: "awaiting-payment",
   DRYING: "drying",
   DRIED: "dried",
-  STORED: "stored",
-  IN_TRANSIT: "in-transit",
   DELIVERED: "delivered",
 };
 
@@ -39,6 +37,7 @@ export function toUiBatch(b: ApiBatch): Batch {
     operator: b.operator?.name ?? "—",
     location: b.location,
     verified: b.chainStatus === "CONFIRMED",
+    chainStatus: b.chainStatus,
     txHash: b.txHash ?? "",
     timeline: (b.events ?? []).map(
       (e): TimelineEvent => ({

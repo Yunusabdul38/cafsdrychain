@@ -24,8 +24,6 @@ enum BatchStage {
   AWAITING_PAYMENT
   DRYING
   DRIED
-  STORED
-  IN_TRANSIT
   DELIVERED
 }
 
@@ -49,9 +47,6 @@ model User {
   status             UserStatus     @default(ACTIVE)
   location           String?
   passwordHash       String
-  /// Unused. Never enforced, and invited users choose their own password.
-  /// Drop in the cleanup migration alongside `supplier` and `transport`.
-  mustChangePassword Boolean        @default(true)
   wallet             Wallet?
   batches            Batch[]              @relation("BatchOperator")
   refreshTokens      RefreshToken[]
@@ -109,23 +104,16 @@ model Batch {
   product         String
   sourceType      String
   source          String
-  /// No longer collected at registration; nullable so existing rows keep their
-  /// value. Drop in a cleanup migration alongside `transport`.
-  supplier        String?
   freshWeight     Float
   finalWeight     Float?
   moisture        Float?
-  /// When the operator confirmed registration. Kept on the original column
-  /// name so the rename needs no migration.
-  entryDate       DateTime     @map("deliveryDate")
+  /// When the operator confirmed registration.
+  entryDate       DateTime
   dryingStart     DateTime?
   dryingEnd       DateTime?
   /// How the batch was dried (solar tunnel, cabinet, hybrid…).
   dryingMethod    String?
   quality         String?
-  storageLocation String?
-  packaging       String?
-  transport       String?
   destination     String?
   stage           BatchStage   @default(REGISTERED)
   location        String
@@ -208,10 +196,6 @@ model Location {
 model AppSettings {
   id          Int      @id @default(1)
   feesEnabled Boolean  @default(true)
-  /// Retired in favour of the per-hub toggle. Nothing reads it. The column
-  /// stays because Railway deploys with `prisma db push`, which refuses a
-  /// destructive change — drop it in the cleanup migration.
-  minimumFee  Int      @default(0)
   updatedAt   DateTime @updatedAt
 }
 

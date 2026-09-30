@@ -33,8 +33,6 @@ contract BatchRegistryTest is Test {
     BatchRegistry.BatchState constant REGISTERED = BatchRegistry.BatchState.Registered;
     BatchRegistry.BatchState constant DRYING = BatchRegistry.BatchState.DryingStarted;
     BatchRegistry.BatchState constant DRIED = BatchRegistry.BatchState.DryingCompleted;
-    BatchRegistry.BatchState constant STORED = BatchRegistry.BatchState.InStorage_Retired;
-    BatchRegistry.BatchState constant TRANSIT = BatchRegistry.BatchState.InTransit_Retired;
     BatchRegistry.BatchState constant DELIVERED = BatchRegistry.BatchState.Delivered;
 
     function setUp() public {
@@ -119,26 +117,14 @@ contract BatchRegistryTest is Test {
         assertFalse(registry.verifyMetadata("DRY-2", "tampered"));
     }
 
-    /// Storage and dispatch are retired: neither can be written any more.
-    function test_RevertWhen_WritingRetiredStorage() public {
-        _advanceTo("RT-1", DRIED);
-        vm.prank(logistics);
-        vm.expectRevert(BatchRegistry.InvalidState.selector);
-        registry.updateLogistics("RT-1", "WH", STORED, "m");
-    }
-
-    function test_RevertWhen_WritingRetiredInTransit() public {
-        _advanceTo("RT-2", DRIED);
-        vm.prank(logistics);
-        vm.expectRevert(BatchRegistry.InvalidState.selector);
-        registry.updateLogistics("RT-2", "WH", TRANSIT, "m");
-    }
-
-    /// Their numbering is preserved so delivered batches still decode correctly.
-    function test_RetiredStagesKeepDeliveredAtPositionFive() public pure {
-        assertEq(uint8(BatchRegistry.BatchState.InStorage_Retired), 3);
-        assertEq(uint8(BatchRegistry.BatchState.InTransit_Retired), 4);
-        assertEq(uint8(BatchRegistry.BatchState.Delivered), 5);
+    /// The relayer encodes these positions directly (see chain/relayer.ts). A
+    /// reordering here would write the wrong stage on chain without erroring,
+    /// so the numbering is pinned rather than left to review.
+    function test_StatePositionsMatchTheRelayer() public pure {
+        assertEq(uint8(BatchRegistry.BatchState.Registered), 0);
+        assertEq(uint8(BatchRegistry.BatchState.DryingStarted), 1);
+        assertEq(uint8(BatchRegistry.BatchState.DryingCompleted), 2);
+        assertEq(uint8(BatchRegistry.BatchState.Delivered), 3);
     }
 
     // ------------------------------------------------- transition enforcement --
@@ -228,9 +214,8 @@ contract BatchRegistryTest is Test {
     function test_CanTransition_MatchesEnforcement() public {
         _advanceTo("T9", DRIED);
         assertTrue(registry.canTransition("T9", DELIVERED));
-        assertFalse(registry.canTransition("T9", STORED));
-        assertFalse(registry.canTransition("T9", TRANSIT));
         assertFalse(registry.canTransition("T9", DRYING));
+        assertFalse(registry.canTransition("T9", REGISTERED));
         assertFalse(registry.canTransition("UNKNOWN", DELIVERED));
     }
 

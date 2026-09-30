@@ -31,20 +31,6 @@ export const nextActionByStage: Record<BatchStage, NextAction | null> = {
     heading: "Record delivery details",
     next: "delivered",
   },
-  // Legacy: no new batch reaches this stage, but one already there must still
-  // be completable.
-  stored: {
-    label: "Record delivery",
-    heading: "Record delivery details",
-    next: "delivered",
-  },
-  // Legacy: no new batch reaches this stage, but any batch already sitting in
-  // it must still be completable.
-  "in-transit": {
-    label: "Confirm delivery",
-    heading: "Confirm delivery",
-    next: "delivered",
-  },
   delivered: null,
 };
 

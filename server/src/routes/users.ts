@@ -25,8 +25,7 @@ router.post(
   validate({ body: createUserSchema }),
   asyncHandler(async (req, res) => {
     // Provisioning a user derives their deterministic wallet automatically.
-    const { user } = await userService.createUser(req.body);
-    res.status(201).json({ user });
+    res.status(201).json(await userService.createUser(req.body));
   })
 );
 

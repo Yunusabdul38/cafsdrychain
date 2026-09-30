@@ -7,8 +7,14 @@ import {
   relayRegister,
   relayDrying,
   relayLogistics,
+  chainStateOf,
+  forwarderNonce,
+  awaitNonceAdvance,
   type RelayResult,
 } from '../chain/relayer.js';
+import { chainEnabled } from '../chain/client.js';
+import { logger } from '../lib/logger.js';
+import { env } from '../env.js';
 import type { AdvanceBatchInput, CreateBatchInput } from '../schemas/index.js';
 import { assertPaidForDrying, waivePaymentForBatch } from './paymentService.js';
 import { feesApplyAt } from './settingsService.js';
@@ -29,10 +35,6 @@ const EVENT_TITLE: Record<BatchStage, string> = {
   AWAITING_PAYMENT: 'Drying fee set',
   DRYING: 'Drying started',
   DRIED: 'Drying completed',
-  // Retired stages. Unreachable for new batches, kept so historical events
-  // still render a title.
-  STORED: 'Moved to storage',
-  IN_TRANSIT: 'Dispatched',
   DELIVERED: 'Delivered',
 };
 
@@ -62,7 +64,6 @@ function hashBatch(b: Record<string, unknown>): string {
     product: b.product,
     source: b.source,
     sourceType: b.sourceType,
-    supplier: b.supplier,
     freshWeight: b.freshWeight,
     finalWeight: b.finalWeight ?? null,
     moisture: b.moisture ?? null,
@@ -225,7 +226,10 @@ export async function advanceBatch(
     case 'DRIED':
       data.dryingEnd = input.dryingEnd ?? now;
       if (input.finalWeight !== undefined) data.finalWeight = input.finalWeight;
-      if (input.moisture !== undefined) data.moisture = input.moisture;
+      // With collection off, nothing is recorded — not 0%, which would read as
+      // a measurement and resurface on these batches if collection came back.
+      // Enforced here, not just by hiding the field, so it holds for any client.
+      if (input.moisture !== undefined && !env.HIDE_MOISTURE) data.moisture = input.moisture;
       if (input.quality) data.quality = input.quality;
       break;
     case 'DELIVERED':
@@ -253,22 +257,128 @@ export async function advanceBatch(
     },
   });
 
-  // On-chain write signed by the operator's derived wallet (gas paid by relayer).
-  const index = batch.operator.wallet?.index;
-  if (index !== undefined) {
-    let res: RelayResult;
-    const facility = batch.location;
-    if (target === 'DRYING') {
-      res = await relayDrying(index, batchId, facility, 1, batch.freshWeight, hash);
-    } else if (target === 'DRIED') {
-      res = await relayDrying(index, batchId, facility, 2, input.finalWeight ?? batch.freshWeight, hash);
-    } else {
-      res = await relayLogistics(index, batchId, facility, 5, hash);
-    }
-    await persistChain(batch.id, res, true);
+  // Write on-chain through the reconciler rather than relaying this stage
+  // alone: if an earlier one never landed, the registry would reject this as an
+  // invalid transition, so any gap has to be closed first. A batch already in
+  // step costs one view call.
+  //
+  // A failure here leaves the record saved and the chain behind, which the next
+  // write or an explicit reconcile will close. It is not thrown, because losing
+  // an operator's work to a passing RPC error would be the worse outcome.
+  if (batch.operator.wallet) {
+    await reconcileBatchChain(batchId).catch((err) =>
+      logger.error({ err, batchId }, 'Chain write failed — record saved, chain behind')
+    );
   }
 
   return getBatch(batchId);
+}
+
+/**
+ * The on-chain state each off-chain stage corresponds to.
+ *
+ * Payment is deliberately absent from the chain, so a batch awaiting or having
+ * paid its fee sits at Registered there — that is agreement, not a gap.
+ */
+const CHAIN_STATE: Record<BatchStage, number> = {
+  REGISTERED: 0,
+  AWAITING_PAYMENT: 0,
+  DRYING: 1,
+  DRIED: 2,
+  DELIVERED: 3,
+};
+
+/** Tries per stage before a reconcile gives up and leaves it to the next one. */
+const MAX_STEP_ATTEMPTS = 3;
+
+/**
+ * Bring the chain up to date with what the database already records.
+ *
+ * A database write and a chain write cannot be made atomic — no two-phase
+ * commit exists across them — and rolling the database back when a relay fails
+ * would be worse: the transaction may have actually landed while the response
+ * was lost, and the registry would then refuse the retry as an invalid
+ * transition, stranding the batch with no way forward.
+ *
+ * So the database records what happened and this makes the chain agree,
+ * replaying every stage the registry has not seen, in order. It reads the
+ * registry's own state rather than trusting `chainStatus`, because the case
+ * worth fixing is precisely the one where our record of the chain is wrong.
+ *
+ * Safe to call at any time: a batch already in step does nothing.
+ */
+export async function reconcileBatchChain(batchId: string) {
+  if (!chainEnabled()) throw new AppError(400, 'Blockchain integration is switched off');
+
+  const batch = await prisma.batch.findUnique({
+    where: { batchId },
+    include: { operator: { include: { wallet: true } } },
+  });
+  if (!batch) throw new AppError(404, 'Batch not found');
+
+  const index = batch.operator.wallet?.index;
+  if (index === undefined) {
+    throw new AppError(400, "This batch's operator has no wallet, so nothing can be signed for it");
+  }
+  const hash = batch.metadataHash;
+  if (!hash) throw new AppError(400, 'Batch has no metadata hash to anchor');
+
+  const target = CHAIN_STATE[batch.stage];
+  const [state, startNonce] = await Promise.all([chainStateOf(batchId), forwarderNonce(index)]);
+  let current = state ?? -1;
+  let nonce = startNonce;
+  let attempts = 0;
+  const replayed: string[] = [];
+
+  // One stage at a time; the registry enforces the same order.
+  //
+  // Progress comes from confirmed receipts, not from re-reading the chain:
+  // Base's RPC is load balanced, and a read straight after a write can reach a
+  // node that has not caught up, so the step looked undone and was written
+  // twice — which the registry rejects.
+  while (current < target) {
+    const res =
+      current === -1
+        ? await relayRegister(index, batchId, batch.location, batch.freshWeight, hash)
+        : current === 0
+          ? await relayDrying(index, batchId, batch.location, 1, batch.freshWeight, hash)
+          : current === 1
+            ? await relayDrying(index, batchId, batch.location, 2, batch.finalWeight ?? batch.freshWeight, hash)
+            : await relayLogistics(index, batchId, batch.location, 3, hash);
+
+    if (res.status !== 'CONFIRMED') {
+      // Usually not a real failure: straight after a write, a load-balanced RPC
+      // can report the chain a step behind or hand back a stale nonce, and the
+      // step is refused. Mostly that happens at gas estimation and costs
+      // nothing; occasionally the transaction is sent and reverts, costing a
+      // fraction of a cent. Re-read and try again before giving up.
+      if (++attempts > MAX_STEP_ATTEMPTS) {
+        await persistChain(batch.id, res, true);
+        throw new AppError(502, 'Could not write to the blockchain. The record is saved and will be retried.');
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+      current = (await chainStateOf(batchId)) ?? -1;
+      nonce = await forwarderNonce(index);
+      continue;
+    }
+    attempts = 0;
+    await persistChain(batch.id, res, true);
+    if (res.txHash) replayed.push(res.txHash);
+    current += 1;
+
+    // The next step is signed against the forwarder nonce, so it has to wait
+    // until the node has registered this one — or it signs a stale nonce and
+    // is refused.
+    if (current < target) {
+      if (!(await awaitNonceAdvance(index, nonce))) {
+        throw new AppError(502, 'The blockchain did not confirm in time. The record is saved and will be retried.');
+      }
+      nonce += 1n;
+    }
+  }
+
+  logger.info({ batchId, replayed: replayed.length, state: current }, 'Chain reconciled');
+  return { batchId, chainState: current, replayed };
 }
 
 async function persistChain(id: string, res: RelayResult, latestEvent = false) {

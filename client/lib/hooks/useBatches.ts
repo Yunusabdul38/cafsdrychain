@@ -8,8 +8,6 @@ export type ApiStage =
   | "AWAITING_PAYMENT"
   | "DRYING"
   | "DRIED"
-  | "STORED"
-  | "IN_TRANSIT"
   | "DELIVERED";
 
 export type ApiPayment = {
@@ -107,6 +105,27 @@ export function useAdvanceBatch(batchId: string) {
   return useMutation({
     mutationFn: (input: AdvanceBatchInput) =>
       api.post<{ batch: ApiBatch }>(`/api/batches/${batchId}/advance`, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["batches"] });
+      qc.invalidateQueries({ queryKey: ["batch", batchId] });
+    },
+  });
+}
+
+/**
+ * Push a batch's on-chain record up to what the database already holds.
+ *
+ * Writes are reconciled automatically on every advance and by a periodic sweep,
+ * so this is the manual way out for a batch left behind that nothing has since
+ * touched — it replays only what the registry is missing.
+ */
+export function useReconcileChain(batchId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<{ chainState: number; replayed: string[] }>(
+        `/api/batches/${batchId}/reconcile-chain`
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["batches"] });
       qc.invalidateQueries({ queryKey: ["batch", batchId] });

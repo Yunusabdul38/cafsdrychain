@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardHeader } from "@/components/ui/Card";
+import { useExplorer } from "@/lib/explorer";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/dashboard/States";
 import { LinkIcon, ExternalLinkIcon } from "@/components/icons";
@@ -20,6 +21,7 @@ const TONE = {
  */
 export default function RelayerWalletCard() {
   const { data, isLoading, isError } = useRelayerWallet();
+  const { addressUrl } = useExplorer();
 
   return (
     <Card>
@@ -96,7 +98,7 @@ export default function RelayerWalletCard() {
                     </p>
                   </div>
                   <a
-                    href={`https://sepolia.basescan.org/address/${w.address}`}
+                    href={addressUrl(w.address)}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Opens the wallet on the block explorer in a new tab"

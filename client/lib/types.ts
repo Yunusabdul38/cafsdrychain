@@ -5,8 +5,6 @@ export type BatchStage =
   | "awaiting-payment"
   | "drying"
   | "dried"
-  | "stored"
-  | "in-transit"
   | "delivered";
 
 export type TimelineEvent = {
@@ -47,6 +45,8 @@ export type Batch = {
   operator: string;
   location: string; // drying facility
   verified: boolean;
+  /** Raw chain state, so the UI can tell "still confirming" from "behind". */
+  chainStatus?: "PENDING" | "CONFIRMED" | "FAILED";
   txHash: string; // registration tx
   timeline: TimelineEvent[];
 };
