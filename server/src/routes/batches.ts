@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth, requireRole, requireLiveSession } from '../middleware/auth.js';
 import { advanceBatchSchema, batchIdParam, createBatchSchema } from '../schemas/index.js';
 import * as batchService from '../services/batchService.js';
+import { AppError } from '../middleware/error.js';
 import { prisma } from '../lib/prisma.js';
 
 const router = Router();
@@ -63,6 +64,32 @@ router.post(
       req.body
     );
     res.json({ batch });
+  })
+);
+
+/**
+ * Push a batch's on-chain record up to what the database holds. Every write
+ * and the background sweep already do this; this is the manual "Retry now".
+ */
+router.post(
+  '/:batchId/reconcile-chain',
+  requireRole('OPERATOR', 'ADMIN'),
+  requireLiveSession,
+  validate({ params: batchIdParam }),
+  asyncHandler(async (req, res) => {
+    // Operators only for their own hub, as when recording a stage. Admins may
+    // repair any batch: this never changes the record, only the chain's copy.
+    if (req.user!.role === 'OPERATOR') {
+      const [me, batch] = await Promise.all([
+        prisma.user.findUnique({ where: { id: req.user!.sub }, select: { location: true } }),
+        prisma.batch.findUnique({ where: { batchId: req.params.batchId }, select: { location: true } }),
+      ]);
+      if (!batch) throw new AppError(404, 'Batch not found');
+      if (!me?.location || me.location !== batch.location) {
+        throw new AppError(403, 'You are not assigned to the hub where this batch is located');
+      }
+    }
+    res.json(await batchService.reconcileBatchChain(req.params.batchId));
   })
 );
 

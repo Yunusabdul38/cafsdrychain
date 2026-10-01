@@ -40,7 +40,6 @@ async function main() {
   });
 
   logger.info(`Seeded admin: ${email}`);
-  logger.info(`Temporary password: ${password} (change on first login)`);
   if (!isDerivationConfigured()) {
     logger.warn('MASTER_MNEMONIC not set — admin wallet not derived. Set it and re-provision users.');
   }

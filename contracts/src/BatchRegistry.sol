@@ -57,13 +57,7 @@ contract BatchRegistry is
         Registered, // 0
         DryingStarted, // 1
         DryingCompleted, // 2
-        // 3 and 4 are retired stages. Their values must stay declared: enum
-        // members are stored as their position, so deleting either would
-        // renumber Delivered and make every batch already delivered on chain
-        // decode as something else entirely.
-        InStorage_Retired, // 3 — rejected on write, kept so old records decode
-        InTransit_Retired, // 4 — rejected on write, kept so old records decode
-        Delivered // 5
+        Delivered // 3
     }
 
     struct Batch {
@@ -241,8 +235,8 @@ contract BatchRegistry is
 
     /**
      * @notice Record delivery.
-     * @dev Storage and dispatch are both retired: a batch goes from dried
-     *      straight to delivered. Writing either retired value is refused.
+     * @dev Delivery is the only state this writes; a batch goes from dried
+     *      straight to delivered.
      */
     function updateLogistics(
         string calldata batchId,
@@ -292,12 +286,6 @@ contract BatchRegistry is
         } else if (from == BatchState.DryingStarted) {
             ok = to == BatchState.DryingCompleted;
         } else if (from == BatchState.DryingCompleted) {
-            ok = to == BatchState.Delivered;
-        } else if (
-            from == BatchState.InStorage_Retired || from == BatchState.InTransit_Retired
-        ) {
-            // No batch can enter these stages any more, but one recorded before
-            // they were retired must still be completable rather than stranded.
             ok = to == BatchState.Delivered;
         }
         // Delivered is terminal: `ok` stays false.
@@ -350,11 +338,6 @@ contract BatchRegistry is
         if (from == BatchState.Registered) return to == BatchState.DryingStarted;
         if (from == BatchState.DryingStarted) return to == BatchState.DryingCompleted;
         if (from == BatchState.DryingCompleted) return to == BatchState.Delivered;
-        if (
-            from == BatchState.InStorage_Retired || from == BatchState.InTransit_Retired
-        ) {
-            return to == BatchState.Delivered;
-        }
         return false;
     }
 

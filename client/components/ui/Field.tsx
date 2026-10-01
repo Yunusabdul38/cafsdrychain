@@ -66,15 +66,20 @@ export function Input({
   className,
   type,
   error,
+  hint,
   ...props
-}: { label?: string; error?: string } & InputHTMLAttributes<HTMLInputElement>) {
+}: { label?: string; error?: string; hint?: string } & InputHTMLAttributes<HTMLInputElement>) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
   const inputType = isPassword ? (showPassword ? "text" : "password") : type;
 
   return (
     <div>
-      {label && <Label htmlFor={id}>{label}</Label>}
+      {label && (
+        <Label htmlFor={id} hint={hint}>
+          {label}
+        </Label>
+      )}
       <div className="relative">
         <input
           id={id}

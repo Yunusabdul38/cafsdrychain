@@ -1,10 +1,30 @@
 import { resend } from './resend.js';
+import { AppError } from '../middleware/error.js';
 import { env } from '../env.js';
 import { logger } from './logger.js';
 
+/**
+ * The one line that explains a failed send. Resend reports failures as a plain
+ * `{ name, message }` object rather than throwing an Error; both are handled.
+ */
+function reasonOf(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const { name, message } = err as { name?: string; message: string };
+    return name ? `${name}: ${message}` : message;
+  }
+  return String(err);
+}
+
 export async function sendPasswordResetEmail(to: string, name: string, link: string) {
   if (!env.RESEND_API_KEY) {
-    logger.warn({ to, link }, 'RESEND_API_KEY not set — password reset link (dev only)');
+    // Printing the link lets a developer reset a password without email set up.
+    // Never in production: anyone who can read the logs could use it to take
+    // over the account.
+    if (env.NODE_ENV === 'production') {
+      logger.error({ to }, 'Password reset email not sent — RESEND_API_KEY is not set');
+    } else {
+      logger.warn({ to, link }, 'RESEND_API_KEY not set — password reset link (development only)');
+    }
     return;
   }
 
@@ -71,26 +91,29 @@ export async function sendPasswordResetEmail(to: string, name: string, link: str
   `;
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resend().emails.send({
       from: 'cafsdrychain@cafsdrychain.com',
       to,
       subject: 'Reset your CAFS DryChain password',
       html: htmlContent,
     });
-    if (error) {
-      logger.error({ error, to }, 'Resend API returned error when sending password reset email');
-    } else {
-      logger.info({ id: data?.id, to }, 'Successfully sent password reset email via Resend');
-    }
+    if (error) throw error;
+    logger.info({ id: data?.id, to }, 'Sent password reset email');
   } catch (err) {
-    logger.error({ err, to }, 'Failed to send password reset email');
+    // Not rethrown: the reset endpoint answers the same way whether or not an
+    // account exists, so a failure here must not change what the caller sees.
+    logger.error({ to, reason: reasonOf(err) }, 'Password reset email was not sent');
   }
 }
 
+/**
+ * Send an account invitation. Unlike a password reset this throws on failure:
+ * the admin who sent it needs to know, or they tell an operator to wait for a
+ * mail that never left.
+ */
 export async function sendInviteEmail(to: string, name: string, link: string, role?: string) {
   if (!env.RESEND_API_KEY) {
-    logger.warn({ to }, 'RESEND_API_KEY not set — skipping invite email');
-    return;
+    throw new AppError(503, 'Email is not configured on the server, so the invitation could not be sent.');
   }
 
   const isNewAdmin = role?.toUpperCase() === 'ADMIN';
@@ -179,73 +202,16 @@ export async function sendInviteEmail(to: string, name: string, link: string, ro
   `;
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resend().emails.send({
       from: 'cafsdrychain@cafsdrychain.com',
       to,
       subject: 'Set up your CAFS DryChain account',
       html: htmlContent,
     });
-    if (error) {
-      logger.error({ error, to }, 'Resend API returned error when sending invite email');
-    } else {
-      logger.info({ id: data?.id, to }, 'Successfully sent invite email via Resend');
-    }
+    if (error) throw error;
+    logger.info({ id: data?.id, to }, 'Sent invite email');
   } catch (err) {
-    logger.error({ err, to }, 'Failed to send invite email');
-  }
-}
-
-
-/**
- * Deliver a public enquiry from the marketing site.
- *
- * With no CONTACT_EMAIL configured the message is logged rather than dropped,
- * the same fallback the password reset link uses, so a misconfiguration is
- * visible instead of silently losing what someone wrote.
- */
-export async function sendContactMessage(input: {
-  name: string;
-  email: string;
-  organization?: string;
-  message: string;
-}) {
-  const to = env.CONTACT_EMAIL;
-
-  if (!to || !env.RESEND_API_KEY) {
-    logger.warn(
-      { input, reason: !to ? 'CONTACT_EMAIL not set' : 'RESEND_API_KEY not set' },
-      'Contact form message could not be emailed — logged instead'
-    );
-    return;
-  }
-
-  const escape = (v: string) =>
-    v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  try {
-    const { data, error } = await resend.emails.send({
-      from: 'cafsdrychain@cafsdrychain.com',
-      to,
-      reply_to: input.email,
-      subject: `Website enquiry from ${input.name}`,
-      html: `
-        <h2 style="font-family:sans-serif;color:#0c3227;">New enquiry</h2>
-        <p style="font-family:sans-serif;color:#4a5568;">
-          <strong>Name:</strong> ${escape(input.name)}<br />
-          <strong>Email:</strong> ${escape(input.email)}<br />
-          <strong>Organization:</strong> ${escape(input.organization ?? 'Not given')}
-        </p>
-        <p style="font-family:sans-serif;color:#0c3227;white-space:pre-wrap;">${escape(
-          input.message
-        )}</p>
-      `,
-    });
-    if (error) {
-      logger.error({ error, input }, 'Resend rejected the contact message');
-      return;
-    }
-    logger.info({ id: data?.id, to }, 'Contact message sent');
-  } catch (err) {
-    logger.error({ err, input }, 'Failed to send contact message');
+    logger.error({ to, reason: reasonOf(err) }, 'Invite email was not sent');
+    throw new AppError(502, 'The invitation email could not be sent. Try resending it in a moment.');
   }
 }

@@ -1,8 +1,10 @@
 import type { TimelineEvent } from "@/lib/types";
+import { useExplorer } from "@/lib/explorer";
 import { formatDateTime, shortHash } from "@/lib/utils";
 import { CheckIcon, ExternalLinkIcon, NoteIcon } from "@/components/icons";
 
 export default function Timeline({ events }: { events: TimelineEvent[] }) {
+  const { txUrl } = useExplorer();
   return (
     <ol className="relative space-y-6">
       <span
@@ -48,7 +50,7 @@ export default function Timeline({ events }: { events: TimelineEvent[] }) {
             )}
             {e.txHash && (
               <a
-                href={`https://sepolia.basescan.org/tx/${e.txHash}`}
+                href={txUrl(e.txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Opens the blockchain record in a new tab"

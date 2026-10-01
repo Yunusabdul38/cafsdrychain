@@ -117,10 +117,14 @@ export async function createUser(input: CreateUserInput) {
     select: publicUser,
   });
 
-  // Best-effort side effects (must not roll back the DB record).
-  void issueInvite(user.id).catch((err) =>
-    logger.error({ err, email: input.email }, 'Failed to send the invitation email')
-  );
+  // The account is already saved; only the email can fail. Report which, so
+  // the admin is not told an invitation went out when it did not.
+  let inviteError: string | null = null;
+  try {
+    await issueInvite(user.id);
+  } catch (err) {
+    inviteError = err instanceof AppError ? err.message : 'The invitation email could not be sent.';
+  }
   if (input.role === 'OPERATOR' && withWallet?.wallet) {
     // Authorise the operator's EOA on-chain so its signatures are accepted.
     grantOperatorRoles(withWallet.wallet.address)
@@ -128,7 +132,7 @@ export async function createUser(input: CreateUserInput) {
       .catch((err) => logger.error({ err }, 'failed to grant operator roles on-chain'));
   }
 
-  return { user: withWallet };
+  return { user: withWallet, inviteSent: inviteError === null, inviteError };
 }
 
 export async function listUsers() {

@@ -66,15 +66,45 @@ async function relay(index: number, data: string): Promise<RelayResult> {
     const receipt = await tx.wait();
     return { txHash: tx.hash, status: receipt?.status === 1 ? 'CONFIRMED' : 'FAILED' };
   } catch (err) {
-    logger.error({ err }, 'meta-tx relay failed');
+    const reason = (err as { shortMessage?: string }).shortMessage ?? (err as Error).message;
+    logger.warn({ reason }, 'meta-tx relay refused');
     return { txHash: null, status: 'FAILED' };
   }
 }
 
-// On-chain BatchState: 0 Registered, 1 DryingStarted, 2 DryingCompleted, 5 Delivered.
-// 3 and 4 are retired slots the registry refuses to write; they stay declared so
-// batches recorded before those stages were dropped still decode. Delivered
-// keeps position 5 for that reason — renumber it only on a fresh deploy.
+// On-chain BatchState: 0 Registered, 1 DryingStarted, 2 DryingCompleted, 3 Delivered.
+// Enum members are stored by position, so this must match BatchRegistry.sol
+// exactly — a mismatch writes the wrong stage without erroring.
+
+/** The forwarder nonce an operator's next meta-transaction must be signed with. */
+export async function forwarderNonce(index: number): Promise<bigint> {
+  const signer = deriveSigner(index);
+  return forwarder().nonces(signer.address) as Promise<bigint>;
+}
+
+/**
+ * Wait until the forwarder reports a nonce past `previous`, for up to ~15s.
+ * Relaying back to back without this signs the second request against a stale
+ * nonce, which the forwarder refuses.
+ */
+export async function awaitNonceAdvance(index: number, previous: bigint): Promise<boolean> {
+  for (let i = 0; i < 15; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    if ((await forwarderNonce(index)) > previous) return true;
+  }
+  return false;
+}
+
+/** The batch's state according to the registry itself, or null if unregistered. */
+export async function chainStateOf(batchId: string): Promise<number | null> {
+  if (!chainEnabled()) return null;
+  const registry = batchRegistry();
+  const [exists, state] = await Promise.all([
+    registry.isBatchExists(batchId) as Promise<boolean>,
+    (registry.getBatchState(batchId) as Promise<bigint>).catch(() => null),
+  ]);
+  return exists && state !== null ? Number(state) : null;
+}
 
 export function relayRegister(
   index: number,
@@ -114,7 +144,7 @@ export function relayLogistics(
   index: number,
   batchId: string,
   facilityId: string,
-  state: 5,
+  state: 3,
   metadataHash: string
 ): Promise<RelayResult> {
   const data = batchRegistry().interface.encodeFunctionData('updateLogistics', [

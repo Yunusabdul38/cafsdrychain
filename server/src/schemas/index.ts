@@ -64,13 +64,6 @@ export const locationIdParam = z.object({
  */
 export const updateSettingsSchema = z.object({ feesEnabled: z.boolean() });
 
-export const contactSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  email: z.string().email().toLowerCase(),
-  organization: z.string().trim().max(160).optional(),
-  message: z.string().trim().min(10, 'Please tell us a little more').max(4000),
-});
-
 export const createBatchSchema = z.object({
   category: z.string().trim().min(2).max(80),
   product: z.string().trim().min(2).max(120),
@@ -80,7 +73,7 @@ export const createBatchSchema = z.object({
   location: z.string().min(2).max(120),
 });
 
-export const BATCH_STAGES = ['REGISTERED', 'AWAITING_PAYMENT', 'DRYING', 'DRIED', 'STORED', 'IN_TRANSIT', 'DELIVERED'] as const;
+export const BATCH_STAGES = ['REGISTERED', 'AWAITING_PAYMENT', 'DRYING', 'DRIED', 'DELIVERED'] as const;
 export const BatchStageEnum = z.enum(BATCH_STAGES);
 
 /**

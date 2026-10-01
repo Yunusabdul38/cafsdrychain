@@ -6,6 +6,8 @@ dotenv.config();
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(5000),
+  // info shows problems and lifecycle events; debug adds every routine request.
+  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   DATABASE_URL: z.string().min(1),
 
   // Auth
@@ -29,6 +31,12 @@ const schema = z.object({
   WALLET_CHAIN: z.string().default('base'),
 
   // On-chain integration (optional — app works off-chain until these are set)
+  // Stop collecting moisture readings, for hubs with no meter. The site hides
+  // the field and the server ignores any value sent; see advanceBatch.
+  HIDE_MOISTURE: z
+    .union([z.string(), z.boolean()])
+    .default('false')
+    .transform((v) => String(v) === 'true'),
   CHAIN_ENABLED: z
     .union([z.string(), z.boolean()])
     .default('false')
@@ -56,8 +64,6 @@ const schema = z.object({
 
   // Email
   RESEND_API_KEY: z.string().optional(),
-  /// Where the public contact form delivers. Logged instead when unset.
-  CONTACT_EMAIL: z.string().email().optional(),
   /// Relayer balance (in ETH) below which admins are warned to top up.
   RELAYER_LOW_BALANCE: z.coerce.number().positive().default(0.01),
   APP_URL: z.string().default('http://localhost:3000'),

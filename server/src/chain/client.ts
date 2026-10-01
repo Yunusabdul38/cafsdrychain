@@ -1,4 +1,5 @@
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
+import { logger } from '../lib/logger.js';
 import { env } from '../env.js';
 import { BATCH_REGISTRY_ABI, FORWARDER_ABI, ROLE_MANAGER_ABI } from './abi.js';
 
@@ -20,8 +21,39 @@ export function chainEnabled(): boolean {
 
 let _provider: JsonRpcProvider | null = null;
 export function provider(): JsonRpcProvider {
-  if (!_provider) _provider = new JsonRpcProvider(env.RPC_URL, env.CHAIN_ID);
+  // staticNetwork skips ethers' own chain detection, which prints "failed to
+  // detect network" every second while the RPC is down. checkRpc() reports it once.
+  if (!_provider) {
+    _provider = new JsonRpcProvider(env.RPC_URL, env.CHAIN_ID, { staticNetwork: true });
+  }
   return _provider;
+}
+
+/**
+ * Confirm at boot that the RPC answers and is the chain CHAIN_ID says.
+ *
+ * A mismatch is the worst failure here, not the loudest: every meta-transaction
+ * signature is bound to the chain id, so writes would all be refused while the
+ * server looks healthy.
+ */
+export async function checkRpc(): Promise<void> {
+  if (!chainEnabled()) return;
+  try {
+    const reported = Number(await provider().send('eth_chainId', []));
+    if (reported !== env.CHAIN_ID) {
+      logger.error(
+        { rpcChainId: reported, configuredChainId: env.CHAIN_ID },
+        'RPC_URL is a different chain from CHAIN_ID — every on-chain write will be refused'
+      );
+      return;
+    }
+    logger.info({ chainId: reported }, 'RPC reachable');
+  } catch (err) {
+    logger.error(
+      { reason: (err as Error).message },
+      'RPC unreachable — batches will save but not reach the chain until it recovers'
+    );
+  }
 }
 
 let _relayer: Wallet | null = null;
