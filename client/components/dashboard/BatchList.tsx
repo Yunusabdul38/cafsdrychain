@@ -1,8 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Batch } from "@/lib/types";
 import { StageBadge } from "@/components/ui/Badge";
 import { formatDate, titleCase } from "@/lib/utils";
-import { ChevronRightIcon } from "@/components/icons";
 
 export default function BatchList({
   batches,
@@ -15,6 +17,21 @@ export default function BatchList({
   showOperator?: boolean;
   showLocation?: boolean;
 }) {
+  const router = useRouter();
+
+  /**
+   * The whole row opens the batch. A <tr> cannot be wrapped in a link, so the
+   * row handles the click and keeps a link's behaviour: Cmd/Ctrl- and
+   * middle-click open a new tab, selecting text does not navigate, and the
+   * Batch ID stays a real link for keyboard users.
+   */
+  const openRow = (e: React.MouseEvent, href: string) => {
+    if ((e.target as HTMLElement).closest("a, button")) return;
+    if (window.getSelection()?.toString()) return;
+    if (e.metaKey || e.ctrlKey || e.button === 1) window.open(href, "_blank");
+    else router.push(href);
+  };
+
   if (batches.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-black/[0.12] bg-white px-6 py-14 text-center">
@@ -56,7 +73,6 @@ export default function BatchList({
                   Entered {formatDate(b.entryDate)}
                 </p>
               </div>
-              <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
             </Link>
           </li>
         ))}
@@ -79,14 +95,15 @@ export default function BatchList({
               <th className="px-5 py-3 font-medium">Weight</th>
               <th className="px-5 py-3 font-medium">Entered</th>
               <th className="px-5 py-3 font-medium">Stage</th>
-              <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody>
             {batches.map((b) => (
               <tr
                 key={b.id}
-                className="border-b border-black/[0.05] last:border-0 hover:bg-mint/40"
+                onClick={(e) => openRow(e, `${basePath}/${b.id}`)}
+                onAuxClick={(e) => e.button === 1 && openRow(e, `${basePath}/${b.id}`)}
+                className="cursor-pointer border-b border-black/[0.05] last:border-0 hover:bg-mint/40"
               >
                 <td className="px-5 py-3.5">
                   <Link
@@ -119,14 +136,6 @@ export default function BatchList({
                 </td>
                 <td className="px-5 py-3.5">
                   <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
-                </td>
-                <td className="px-5 py-3.5 text-right">
-                  <Link
-                    href={`${basePath}/${b.id}`}
-                    className="text-muted hover:text-brand-dark"
-                  >
-                    <ChevronRightIcon className="ml-auto h-5 w-5" />
-                  </Link>
                 </td>
               </tr>
             ))}

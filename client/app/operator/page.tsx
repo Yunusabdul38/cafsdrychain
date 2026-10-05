@@ -14,7 +14,7 @@ import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
 import { operatorMetrics, recentActivity } from "@/lib/metrics";
 import { nextAction, actionForBatch } from "@/lib/lifecycle";
-import { ChevronRightIcon, PlusIcon, SunIcon, QrIcon } from "@/components/icons";
+import { PlusIcon, SunIcon, QrIcon } from "@/components/icons";
 
 export default function OperatorOverview() {
   const { data, isLoading, isError, refetch } = useBatches();
@@ -81,7 +81,6 @@ export default function OperatorOverview() {
                           <span className="hidden shrink-0 text-sm font-semibold text-brand sm:block">
                             {action.label}
                           </span>
-                          <ChevronRightIcon className="h-5 w-5 shrink-0 text-muted" />
                         </Link>
                       </li>
                     );

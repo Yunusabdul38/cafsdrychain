@@ -11,14 +11,19 @@ import { useBatches } from "@/lib/hooks/useBatches";
 import { toUiBatches } from "@/lib/adapters";
 import { formatDate, titleCase } from "@/lib/utils";
 import { actionForBatch } from "@/lib/lifecycle";
-import { ChevronRightIcon, SunIcon } from "@/components/icons";
+import { SunIcon } from "@/components/icons";
 import { LiveIndicator } from "@/components/ui/LiveIndicator";
 
 export default function DryingPage() {
   const { data, isLoading, isError, refetch, dataUpdatedAt } = useBatches();
   const batches = useMemo(() => (data ? toUiBatches(data) : []), [data]);
 
-  const toStart = batches.filter((b) => b.stage === "registered");
+  // Ready to dry means the fee is settled: paid, or recorded as ₦0 where the
+  // hub charges nothing. "registered" is the step before the fee is even set,
+  // so those batches cannot start yet and belong to the payment flow.
+  const toStart = batches.filter(
+    (b) => b.stage === "awaiting-payment" && b.payment?.status === "PAID"
+  );
   const active = batches.filter((b) => b.stage === "drying");
 
   return (
@@ -55,32 +60,33 @@ function Section({ title, empty, batches }: { title: string; empty: string; batc
             const action = actionForBatch(b)!;
             return (
               <li key={b.id}>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-mint text-brand">
-                      <SunIcon className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-semibold text-brand-dark">{titleCase(b.product)}</span>
-                        <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
+                {/* The whole card is the link; the button inside is only its
+                    visible cue, so it is a span, not a nested link. */}
+                <Link
+                  href={`/operator/batches/${b.id}/update`}
+                  className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                >
+                  <Card className="p-4 transition-colors hover:bg-mint/30">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-mint text-brand">
+                        <SunIcon className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate font-semibold text-brand-dark">{titleCase(b.product)}</span>
+                          <StageBadge stage={b.stage} paid={b.payment?.status === "PAID"} />
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted">
+                          <span className="font-mono">{b.id}</span> · {b.freshWeight} kg · in{" "}
+                          {formatDate(b.entryDate)}
+                        </p>
                       </div>
-                      <p className="mt-0.5 text-xs text-muted">
-                        <span className="font-mono">{b.id}</span> · {b.freshWeight} kg · in{" "}
-                        {formatDate(b.entryDate)}
-                      </p>
+                      <span className="hidden shrink-0 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white sm:block">
+                        {action.label}
+                      </span>
                     </div>
-                    <Link
-                      href={`/operator/batches/${b.id}/update`}
-                      className="hidden shrink-0 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover sm:block"
-                    >
-                      {action.label}
-                    </Link>
-                    <Link href={`/operator/batches/${b.id}/update`} className="shrink-0 text-muted sm:hidden">
-                      <ChevronRightIcon className="h-5 w-5" />
-                    </Link>
-                  </div>
-                </Card>
+                  </Card>
+                </Link>
               </li>
             );
           })}

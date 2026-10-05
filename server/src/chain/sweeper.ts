@@ -65,8 +65,3 @@ export function startChainSweeper(): void {
   logger.info({ everyMinutes: INTERVAL_MS / 60000 }, 'Chain sweeper started');
   void sweep();
 }
-
-export function stopChainSweeper(): void {
-  if (timer) clearInterval(timer);
-  timer = null;
-}

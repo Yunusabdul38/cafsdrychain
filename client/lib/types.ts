@@ -61,13 +61,3 @@ export type Operator = {
   batches: number;
   joined: string;
 };
-
-export type ChainRecord = {
-  txHash: string;
-  batchId: string;
-  action: string;
-  actor: string;
-  timestamp: string;
-  block: number;
-  status: "confirmed" | "pending";
-};

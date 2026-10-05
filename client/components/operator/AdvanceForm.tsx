@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useExplorer } from "@/lib/explorer";
 import type { Batch } from "@/lib/types";
 import { nextAction } from "@/lib/lifecycle";
@@ -51,6 +51,26 @@ export default function AdvanceForm({
   const [error, setError] = useState<string | null>(null);
   const [alreadyDone, setAlreadyDone] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  // Drying must run an hour before it can be completed. The server enforces
+  // it; this says so up front and counts down, rather than letting an
+  // operator fill in the form only to be refused.
+  const readyAt =
+    batch.stage === "drying" && batch.dryingStart
+      ? new Date(batch.dryingStart).getTime() + MIN_DRYING_MS
+      : null;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (readyAt === null) return;
+    const tick = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= readyAt) clearInterval(tick);
+    }, 15_000);
+    return () => clearInterval(tick);
+  }, [readyAt]);
+  const minutesLeft = readyAt === null ? 0 : Math.ceil((readyAt - now) / 60_000);
+  const tooEarly = minutesLeft > 0;
 
   // Pricing and collecting the drying fee is its own flow, not a stage form.
   // Every hook above must run before this return, or the hook order changes
@@ -263,6 +283,16 @@ export default function AdvanceForm({
             </div>
           )}
 
+          {tooEarly && batch.dryingStart && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+              <span className="font-semibold">Too early to complete.</span> Drying
+              started at {formatDateTime(batch.dryingStart)} and must run for at least
+              an hour, so it can be completed from{" "}
+              {formatDateTime(new Date(readyAt!).toISOString())} in{" "}
+              {minutesLeft} minute{minutesLeft === 1 ? "" : "s"}.
+            </div>
+          )}
+
           <Fields stage={batch.stage} errors={fieldErrors} dryingStart={batch.dryingStart} />
 
           <div className="flex items-center gap-2 rounded-2xl border border-black/[0.08] bg-mint/40 px-4 py-3 text-sm text-brand-dark">
@@ -271,8 +301,10 @@ export default function AdvanceForm({
           </div>
 
           <div className="flex flex-col gap-2 pt-1 sm:flex-row-reverse">
-            <Button type="submit" full size="lg" disabled={advance.isPending}>
-              {advance.isPending ? (
+            <Button type="submit" full size="lg" disabled={advance.isPending || tooEarly}>
+              {tooEarly ? (
+                `Available in ${minutesLeft} min`
+              ) : advance.isPending ? (
                 <span className="flex items-center justify-center gap-2">
                   <Spinner className="h-5 w-5 animate-spin text-white" />
                   Saving & recording…

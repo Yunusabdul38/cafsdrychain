@@ -20,7 +20,10 @@ import { assertPaidForDrying, waivePaymentForBatch } from './paymentService.js';
 import { feesApplyAt } from './settingsService.js';
 
 /** Shortest run that can be recorded between drying start and completion. */
+/** Solar drying takes hours; a shorter run is a mis-entry, not a record. */
 const MIN_DRYING_MS = 60 * 60 * 1000;
+/** Allowance for a device clock running slightly ahead of the server's. */
+const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 const ORDER: BatchStage[] = [
   'REGISTERED',
@@ -205,14 +208,30 @@ export async function advanceBatch(
     );
   }
 
-  if (input.dryingEnd) {
-    const startedAt = batch.dryingStart ?? input.dryingStart;
-    // Solar drying takes hours; anything shorter is a mis-entry, not a record.
-    if (startedAt && input.dryingEnd.getTime() - startedAt.getTime() < MIN_DRYING_MS) {
-      throw new AppError(
-        400,
-        'Drying must run for at least an hour before it can be completed'
-      );
+  // Recorded times describe what has happened, so none may lie in the future —
+  // or a completion time ahead of the clock would satisfy the hour unearned.
+  const latest = now.getTime() + CLOCK_SKEW_MS;
+  if (target === 'DRYING' && input.dryingStart && input.dryingStart.getTime() > latest) {
+    throw new AppError(400, 'Drying cannot be recorded as starting at a time that has not happened yet');
+  }
+  if (target === 'DRIED') {
+    const endedAt = input.dryingEnd ?? now;
+    if (endedAt.getTime() > latest) {
+      throw new AppError(400, 'Drying cannot be completed at a time that has not happened yet');
+    }
+    if (batch.dryingStart) {
+      const ranMs = endedAt.getTime() - batch.dryingStart.getTime();
+      if (ranMs < MIN_DRYING_MS) {
+        // In minutes rather than clock times: the server does not know the
+        // operator's timezone, and "in 37 minutes" needs none.
+        const waitMin = Math.ceil((batch.dryingStart.getTime() + MIN_DRYING_MS - now.getTime()) / 60_000);
+        throw new AppError(
+          400,
+          waitMin > 0
+            ? `Drying must run for at least an hour. It can be completed in ${waitMin} minute${waitMin === 1 ? '' : 's'}.`
+            : 'The completion time must be at least an hour after drying started.'
+        );
+      }
     }
   }
 
