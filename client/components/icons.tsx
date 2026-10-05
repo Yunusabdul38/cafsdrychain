@@ -131,23 +131,6 @@ export function MailIcon(props: IconProps) {
   );
 }
 
-export function PhoneIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M5 4h3l1.5 4-2 1.5a11 11 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
-    </svg>
-  );
-}
-
-export function PinIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </svg>
-  );
-}
-
 export function MenuIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -237,14 +220,6 @@ export function BellIcon(props: IconProps) {
   );
 }
 
-export function ChevronRightIcon(props: IconProps) {
-  return (
-    <svg {...base} {...props}>
-      <path d="m9 6 6 6-6 6" />
-    </svg>
-  );
-}
-
 export function ChevronLeftIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -279,7 +254,6 @@ export function DownloadIcon(props: IconProps) {
   );
 }
 
-
 export function FileIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
@@ -297,7 +271,6 @@ export function BuildingIcon(props: IconProps) {
     </svg>
   );
 }
-
 
 export function TrashIcon(props: IconProps) {
   return (
